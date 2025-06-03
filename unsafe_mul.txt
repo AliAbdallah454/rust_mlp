@@ -1,0 +1,40 @@
+    pub fn mul_par_unsafe(&self, matrix: &Tensor, nb_threads: usize) -> Tensor {
+    let c1 = self.cols as usize;
+    let r1 = self.rows as usize;
+
+    assert_eq!(c1, matrix.rows as usize, "Matrix dimensions do not match!");
+
+    let mut result = vec![0.0f64; r1];
+    let result_ptr = result.as_mut_ptr(); // raw pointer to result buffer
+
+    let chunk_size = r1 / nb_threads;
+    let mut handles = vec![];
+
+    for t in 0..nb_threads {
+        let start = t * chunk_size;
+        let end = if t == nb_threads - 1 { r1 } else { start + chunk_size };
+
+        let a = self.data.clone();
+        let b = matrix.data.clone();
+        let result_ptr = result_ptr;
+
+        let handle = thread::spawn(move || {
+            for i in start..end {
+                let mut sum = 0.0;
+                for j in 0..c1 {
+                    sum += a[i * c1 + j] * b[j];
+                }
+                unsafe {
+                    *result_ptr.add(i) = sum;
+                }
+            }
+        });
+        handles.push(handle);
+    }
+
+    for handle in handles {
+        handle.join().unwrap();
+    }
+
+    Tensor::new(result, r1 as u32, 1)
+}
