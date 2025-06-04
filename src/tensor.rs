@@ -1,5 +1,6 @@
 use std::time::{Instant};
 use std::{thread, vec};
+use std::ops::{Add, Sub};
 
 use rand_pcg::Pcg64;
 use rand::distributions::{Distribution, Uniform};
@@ -11,11 +12,35 @@ struct RawPointerWrapper {
 
 unsafe impl Send for RawPointerWrapper {}
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Tensor {
     pub data: Vec<f64>,
     pub rows: u32,
     pub cols: u32
+}
+
+// Overload the + operator for Tensor + Tensor
+impl Add for &Tensor {
+    type Output = Tensor;
+
+    fn add(self, rhs: &Tensor) -> Tensor {
+        assert_eq!(self.rows, rhs.rows, "Tensor add: row mismatch");
+        assert_eq!(self.cols, rhs.cols, "Tensor add: col mismatch");
+        let data = self.data.iter().zip(rhs.data.iter()).map(|(a, b)| a + b).collect();
+        Tensor::new(data, self.rows, self.cols)
+    }
+}
+
+// Overload the - operator for Tensor - Tensor
+impl Sub for Tensor {
+    type Output = Tensor;
+
+    fn sub(self, rhs: Tensor) -> Tensor {
+        assert_eq!(self.rows, rhs.rows, "Tensor sub: row mismatch");
+        assert_eq!(self.cols, rhs.cols, "Tensor sub: col mismatch");
+        let data = self.data.iter().zip(rhs.data.iter()).map(|(a, b)| a - b).collect();
+        Tensor::new(data, self.rows, self.cols)
+    }
 }
 
 impl Tensor {
@@ -26,6 +51,10 @@ impl Tensor {
             rows: rows,
             cols: cols
         }
+    }
+
+    pub fn scalar(scalar: f64) -> Tensor {
+        Tensor { data: vec![scalar], rows: 1, cols: 1 }
     }
 
     pub fn random(rows: u32, cols: u32, seed: u64) -> Self {
@@ -190,4 +219,9 @@ impl Tensor {
         Tensor::new(result, r1 as u32, c2 as u32)
     }
 
+    /// Returns a new Tensor where each element is squared (elementwise square)
+    pub fn square(&self) -> Tensor {
+        let data = self.data.iter().map(|x| x * x).collect();
+        Tensor::new(data, self.rows, self.cols)
+    }
 }
