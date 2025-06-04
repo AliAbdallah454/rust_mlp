@@ -32,6 +32,17 @@ impl Add for &Tensor {
 }
 
 // Overload the - operator for Tensor - Tensor
+impl Sub for &Tensor {
+    type Output = Tensor;
+
+    fn sub(self, rhs: &Tensor) -> Tensor {
+        assert_eq!(self.rows, rhs.rows, "Tensor sub: row mismatch");
+        assert_eq!(self.cols, rhs.cols, "Tensor sub: col mismatch");
+        let data = self.data.iter().zip(rhs.data.iter()).map(|(a, b)| a - b).collect();
+        Tensor::new(data, self.rows, self.cols)
+    }
+}
+
 impl Sub for Tensor {
     type Output = Tensor;
 
@@ -224,4 +235,87 @@ impl Tensor {
         let data = self.data.iter().map(|x| x * x).collect();
         Tensor::new(data, self.rows, self.cols)
     }
+
+    // Element wise multiplication
+    pub fn hadamard(&self, other: &Tensor) -> Tensor {
+        assert_eq!(self.rows, other.rows, "Tensor hadamard: row mismatch");
+        assert_eq!(self.cols, other.cols, "Tensor hadamard: col mismatch");
+        
+        let data = self.data.iter().zip(other.data.iter()).map(|(a, b)| a * b).collect();
+        Tensor::new(data, self.rows, self.cols)
+    }
+
+    /// Apply ReLU activation function
+    pub fn relu(&self) -> Tensor {
+        let data = self.data.iter().map(|&x| if x > 0.0 { x } else { 0.0 }).collect();
+        Tensor::new(data, self.rows, self.cols)
+    }
+
+    /// ReLU derivative (1 if x > 0, 0 otherwise)
+    pub fn relu_derivative(&self) -> Tensor {
+        let data = self.data.iter().map(|&x| if x > 0.0 { 1.0 } else { 0.0 }).collect();
+        Tensor::new(data, self.rows, self.cols)
+    }
+
+    /// Apply sigmoid activation function
+    pub fn sigmoid(&self) -> Tensor {
+        let data = self.data.iter().map(|&x| 1.0 / (1.0 + (-x).exp())).collect();
+        Tensor::new(data, self.rows, self.cols)
+    }
+
+    /// Sigmoid derivative: sigmoid(x) * (1 - sigmoid(x))
+    pub fn sigmoid_derivative(&self) -> Tensor {
+        let sigmoid_vals = self.sigmoid();
+        let ones = Tensor::ones(self.rows, self.cols);
+        let one_minus_sigmoid = &ones - &sigmoid_vals;
+        sigmoid_vals.hadamard(&one_minus_sigmoid)
+    }
+
+    /// Create tensor filled with ones
+    pub fn ones(rows: u32, cols: u32) -> Tensor {
+        let data = vec![1.0; (rows * cols) as usize];
+        Tensor::new(data, rows, cols)
+    }
+
+    /// Create tensor filled with zeros
+    pub fn zeros(rows: u32, cols: u32) -> Tensor {
+        let data = vec![0.0; (rows * cols) as usize];
+        Tensor::new(data, rows, cols)
+    }
+
+    /// Transpose the tensor
+    pub fn transpose(&self) -> Tensor {
+        let mut data = vec![0.0; (self.rows * self.cols) as usize];
+        for i in 0..self.rows {
+            for j in 0..self.cols {
+                data[(j * self.rows + i) as usize] = self.data[(i * self.cols + j) as usize];
+            }
+        }
+        Tensor::new(data, self.cols, self.rows)
+    }
+
+    /// Multiply by scalar
+    pub fn scale(&self, scalar: f64) -> Tensor {
+        let data = self.data.iter().map(|&x| x * scalar).collect();
+        Tensor::new(data, self.rows, self.cols)
+    }
+
+    /// Sum all elements in the tensor
+    pub fn sum(&self) -> f64 {
+        self.data.iter().sum()
+    }
+
+    /// Mean squared error loss
+    pub fn mse_loss(&self, target: &Tensor) -> f64 {
+        let diff = self - target;
+        let squared = diff.square();
+        squared.sum() / (self.rows * self.cols) as f64
+    }
+
+    /// MSE loss derivative
+    pub fn mse_loss_derivative(&self, target: &Tensor) -> Tensor {
+        let diff = self - target;
+        diff.scale(2.0 / (self.rows * self.cols) as f64)
+    }
+
 }
