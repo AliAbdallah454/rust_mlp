@@ -12,7 +12,7 @@ fn main() {
 
     let layers = vec![layer1, layer2, layer3];
 
-    let mlp = MLP::new(layers, 4);
+    let mlp = MLP::new(layers, 2);
     let res = mlp.forward(flattened_image);
 
     res.print();
