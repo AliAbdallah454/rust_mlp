@@ -44,15 +44,21 @@
 use crate::layer::{Layer, ActivationType};
 use crate::tensor::Tensor;
 
+#[derive(Clone, Debug)]
+pub enum LossFunction {
+    MSE,
+    // CategoricalCrossEntropy
+}
 
 pub struct MLP {
     pub layers: Vec<Layer>,
     pub nb_threads: usize,
     pub learning_rate: f64,
+    pub loss_function: LossFunction 
 }
 
 impl MLP {
-    pub fn new(layer_sizes: Vec<u32>, activations: Vec<ActivationType>, learning_rate: f64, nb_threads: usize, seed: u64) -> Self {
+    pub fn new(layer_sizes: Vec<u32>, activations: Vec<ActivationType>, loss_function: LossFunction, learning_rate: f64, nb_threads: usize, seed: u64) -> Self {
         assert_eq!(layer_sizes.len() - 1, activations.len(), "Number of activations must match number of layers");
         
         let mut layers = Vec::new();
@@ -73,24 +79,39 @@ impl MLP {
             layers,
             nb_threads,
             learning_rate,
+            loss_function,
         }
     }
 
     pub fn forward(&mut self, input: &Tensor) -> Tensor {
         let mut current_input = input.clone();
-        for layer in &mut self.layers {
+        // println!("Input shape: {:?}", current_input.dims());
+        
+        for (i, layer) in &mut self.layers.iter_mut().enumerate() {
             current_input = layer.forward(&current_input, self.nb_threads);
+            // println!("Layer {} output shape: {:?}, first few values: {:?}", 
+            //     i, 
+            //     current_input.dims(),
+            //     &current_input.data[0..std::cmp::min(5, current_input.data.len())]
+            // );
         }
         current_input
     }
 
     pub fn backward(&mut self, prediction: &Tensor, target: &Tensor) -> f64 {
+        
         // Compute loss
-        let loss = prediction.mse_loss(target);
-        
-        // Compute initial gradient (derivative of loss w.r.t. output)
-        let mut gradient = prediction.mse_loss_derivative(target);
-        
+        let (loss, mut gradient) = match self.loss_function {
+            LossFunction::MSE => (
+                prediction.mse_loss(target),
+                prediction.mse_loss_derivative(target)
+            ),
+            // LossFunction::CategoricalCrossEntropy => (
+            //     prediction.categorical_cross_entropy(target),
+            //     prediction.categorical_cross_entropy_derivative(target)
+            // ),
+        };
+
         // Backpropagate through layers in reverse order
         let mut weight_gradients = Vec::new();
         let mut bias_gradients = Vec::new();

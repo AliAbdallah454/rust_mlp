@@ -24,6 +24,7 @@ pub enum ActivationType {
     Sigmoid,
     Linear,
     Tanh,
+    // Softmax
 }
 
 pub struct Layer {
@@ -62,6 +63,10 @@ impl Layer {
         let z = self.weights.mul_par(input, nb_threads);
         let z_with_bias = &z + &self.biases;
         
+        // println!("Layer pre-activation (first few values): {:?}", 
+        //     &z_with_bias.data[0..std::cmp::min(5, z_with_bias.data.len())]
+        // );
+        
         // Store pre-activation for backpropagation
         self.last_pre_activation = Some(z_with_bias.clone());
         
@@ -71,7 +76,12 @@ impl Layer {
             ActivationType::Sigmoid => z_with_bias.sigmoid(),
             ActivationType::Linear => z_with_bias,
             ActivationType::Tanh => z_with_bias.tanh(),
+            // ActivationType::Softmax => z_with_bias.softmax()
         };
+        
+        // println!("Layer post-activation (first few values): {:?}", 
+        //     &output.data[0..std::cmp::min(5, output.data.len())]
+        // );
         
         // Store output for backpropagation
         self.last_output = Some(output.clone());
@@ -83,13 +93,21 @@ impl Layer {
         let input = self.last_input.as_ref().expect("Forward pass must be called before backward");
         let pre_activation = self.last_pre_activation.as_ref().expect("Forward pass must be called before backward");
         
+        println!("Backward pass dimensions:");
+        println!("  Gradient: {:?}", gradient.dims());
+        println!("  Input: {:?}", input.dims());
+        println!("  Pre-activation: {:?}", pre_activation.dims());
+        
         // Compute activation derivative
         let activation_derivative = match self.activation {
             ActivationType::ReLU => pre_activation.relu_derivative(),
             ActivationType::Sigmoid => pre_activation.sigmoid_derivative(),
             ActivationType::Linear => Tensor::ones(pre_activation.rows, pre_activation.cols),
             ActivationType::Tanh => pre_activation.tanh_derivative(),
+            // ActivationType::Softmax => pre_activation.softmax_derivative()
         };
+        
+        println!("  Activation derivative: {:?}", activation_derivative.dims());
         
         // Gradient w.r.t. pre-activation: dL/dz = dL/da * da/dz
         let dz = gradient.hadamard(&activation_derivative);
