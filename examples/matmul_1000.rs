@@ -2,9 +2,8 @@ use cp_proj::Tensor;
 
 fn main() {
 
-    let mat1 = Tensor::random(1000, 1100, 42);
-    let mat2 = Tensor::random(1100, 900, 42);
-
+    let mat1 = Tensor::random(1000, 11000, 42);
+    let mat2 = Tensor::random(11000, 900, 42);
 
     let start_par = std::time::Instant::now();
     let res_par = mat1.mul_par(&mat2, 4);

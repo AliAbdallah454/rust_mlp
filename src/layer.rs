@@ -23,6 +23,7 @@ pub enum ActivationType {
     ReLU,
     Sigmoid,
     Linear,
+    Tanh,
 }
 
 pub struct Layer {
@@ -69,6 +70,7 @@ impl Layer {
             ActivationType::ReLU => z_with_bias.relu(),
             ActivationType::Sigmoid => z_with_bias.sigmoid(),
             ActivationType::Linear => z_with_bias,
+            ActivationType::Tanh => z_with_bias.tanh(),
         };
         
         // Store output for backpropagation
@@ -86,6 +88,7 @@ impl Layer {
             ActivationType::ReLU => pre_activation.relu_derivative(),
             ActivationType::Sigmoid => pre_activation.sigmoid_derivative(),
             ActivationType::Linear => Tensor::ones(pre_activation.rows, pre_activation.cols),
+            ActivationType::Tanh => pre_activation.tanh_derivative(),
         };
         
         // Gradient w.r.t. pre-activation: dL/dz = dL/da * da/dz

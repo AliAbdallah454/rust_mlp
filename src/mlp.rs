@@ -42,7 +42,7 @@
 // }
 
 use crate::layer::{Layer, ActivationType};
-use crate::tensor::{self, Tensor};
+use crate::tensor::Tensor;
 
 pub struct MLP {
     pub layers: Vec<Layer>,
@@ -134,9 +134,9 @@ impl MLP {
             epoch_loss /= inputs.len() as f64;
             losses.push(epoch_loss);
             
-            if epoch % 100 == 0 {
-                println!("Epoch {}: Loss = {:.6}", epoch, epoch_loss);
-            }
+            // if epoch % 5 == 0 {
+            println!("Epoch {}: Loss = {:.6}", epoch, epoch_loss);
+            // }
         }
         
         losses

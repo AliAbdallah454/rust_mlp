@@ -1,4 +1,3 @@
-use std::time::{Instant};
 use std::{thread, vec};
 use std::ops::{Add, Sub};
 
@@ -95,7 +94,7 @@ impl Tensor {
     }
 
     #[allow(dead_code)]
-    pub fn modify_vector_chunk(index: usize, val: f64, vec_ptr: RawPointerWrapper) {
+    fn modify_vector_chunk(index: usize, val: f64, vec_ptr: RawPointerWrapper) {
         unsafe {
             let ptr = vec_ptr.raw.add(index);
             *ptr = val;
@@ -269,6 +268,20 @@ impl Tensor {
         let ones = Tensor::ones(self.rows, self.cols);
         let one_minus_sigmoid = &ones - &sigmoid_vals;
         sigmoid_vals.hadamard(&one_minus_sigmoid)
+    }
+
+    /// Apply tanh activation function
+    pub fn tanh(&self) -> Tensor {
+        let data = self.data.iter().map(|&x| x.tanh()).collect();
+        Tensor::new(data, self.rows, self.cols)
+    }
+
+    /// Tanh derivative: 1 - tanh(x)^2
+    pub fn tanh_derivative(&self) -> Tensor {
+        let tanh_vals = self.tanh();
+        let ones = Tensor::ones(self.rows, self.cols);
+        let tanh_squared = tanh_vals.hadamard(&tanh_vals);
+        &ones - &tanh_squared
     }
 
     /// Create tensor filled with ones
