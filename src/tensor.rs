@@ -284,6 +284,36 @@ impl Tensor {
         &ones - &tanh_squared
     }
 
+    pub fn softmax(&self) -> Tensor {
+        let exp_vals: Vec<f64> = self.data.iter().map(|&x| x.exp()).collect();
+        let sum: f64 = exp_vals.iter().sum();
+        let data: Vec<f64> = exp_vals.iter().map(|&x| x / sum).collect();
+        Tensor::new(data, self.rows, self.cols)
+    }
+
+    pub fn softmax_derivative(&self) -> Tensor {
+        assert_eq!(self.cols, 1, "Softmax derivative only implemented for column vectors (r x 1)");
+    
+        let softmax = self.softmax();
+        let len = softmax.data.len();
+        let mut jacobian = vec![0.0; len * len];
+    
+        for i in 0..len {
+            for j in 0..len {
+                let s_i = softmax.data[i];
+                let s_j = softmax.data[j];
+                let val = if i == j {
+                    s_i * (1.0 - s_i)
+                } else {
+                    -s_i * s_j
+                };
+                jacobian[i * len + j] = val;
+            }
+        }
+    
+        Tensor::new(jacobian, len as u32, len as u32) // Jacobian is (r x r)
+    }
+
     /// Create tensor filled with ones
     pub fn ones(rows: u32, cols: u32) -> Tensor {
         let data = vec![1.0; (rows * cols) as usize];
@@ -331,60 +361,30 @@ impl Tensor {
         diff.scale(2.0 / (self.rows * self.cols) as f64)
     }
 
-    // pub fn softmax(&self) -> Tensor {
-    //     let exp_vals: Vec<f64> = self.data.iter().map(|&x| x.exp()).collect();
-    //     let sum: f64 = exp_vals.iter().sum();
-    //     let data: Vec<f64> = exp_vals.iter().map(|&x| x / sum).collect();
-    //     Tensor::new(data, self.rows, self.cols)
-    // }
+    pub fn categorical_cross_entropy(&self, targets: &Tensor) -> f64 {
+        assert_eq!(self.rows, targets.rows, "Batch size mismatch");
+        assert_eq!(self.cols, targets.cols, "Class count mismatch");
+    
+        let epsilon = 1e-15; // To prevent log(0)
+        let mut total_loss = 0.0;
+    
+        for i in 0..(self.rows * self.cols) as usize {
+            let y_true = targets.data[i];
+            let y_pred = self.data[i].max(epsilon).min(1.0 - epsilon); // clip
+            total_loss -= y_true * y_pred.ln();
+        }
+    
+        total_loss / self.rows as f64 // Mean loss over batch
+    }
+    
+    pub fn categorical_cross_entropy_derivative(&self, targets: &Tensor) -> Tensor {
+        assert_eq!(self.rows, targets.rows, "Batch size mismatch");
+        assert_eq!(self.cols, targets.cols, "Class count mismatch");
+        assert_eq!(self.cols, 1, "Categorical cross entropy derivative only implemented for column vectors");
 
-    // pub fn softmax_derivative(&self) -> Tensor {
-    //     assert_eq!(self.cols, 1, "Softmax derivative only implemented for column vectors (r x 1)");
-    
-    //     let softmax = self.softmax();
-    //     let len = softmax.data.len();
-    //     let mut jacobian = vec![0.0; len * len];
-    
-    //     for i in 0..len {
-    //         for j in 0..len {
-    //             let s_i = softmax.data[i];
-    //             let s_j = softmax.data[j];
-    //             let val = if i == j {
-    //                 s_i * (1.0 - s_i)
-    //             } else {
-    //                 -s_i * s_j
-    //             };
-    //             jacobian[i * len + j] = val;
-    //         }
-    //     }
-    
-    //     Tensor::new(jacobian, len as u32, len as u32) // Jacobian is (r x r)
-    // }
-
-    // pub fn categorical_cross_entropy(&self, targets: &Tensor) -> f64 {
-    //     assert_eq!(self.rows, targets.rows, "Batch size mismatch");
-    //     assert_eq!(self.cols, targets.cols, "Class count mismatch");
-    
-    //     let epsilon = 1e-15; // To prevent log(0)
-    //     let mut total_loss = 0.0;
-    
-    //     for i in 0..(self.rows * self.cols) as usize {
-    //         let y_true = targets.data[i];
-    //         let y_pred = self.data[i].max(epsilon).min(1.0 - epsilon); // clip
-    //         total_loss -= y_true * y_pred.ln();
-    //     }
-    
-    //     total_loss / self.rows as f64 // Mean loss over batch
-    // }
-    
-    // pub fn categorical_cross_entropy_derivative(&self, targets: &Tensor) -> Tensor {
-    //     assert_eq!(self.rows, targets.rows, "Batch size mismatch");
-    //     assert_eq!(self.cols, targets.cols, "Class count mismatch");
-    //     assert_eq!(self.cols, 1, "Categorical cross entropy derivative only implemented for column vectors");
-
-    //     // self: softmax output, targets: one-hot labels
-    //     let diff = self - targets;
-    //     diff.scale(1.0 / self.rows as f64) // Mean derivative over batch
-    // }
+        // self: softmax output, targets: one-hot labels
+        let diff = self - targets;
+        diff.scale(1.0 / self.rows as f64) // Mean derivative over batch
+    }
 
 }

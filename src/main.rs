@@ -5,11 +5,6 @@ use cp_proj::tensor::Tensor;
 
 fn main() {
 
-    // let v = Tensor::new(vec![10.0, 1.0, 2.0, 3.0], 4, 1);
-    // let v = v.softmax_derivative();
-    // v.print();
-    // v.sum();
-
     let train_data_result = MnistData::load_from_files(
         "./mnist/train-images.idx3-ubyte",
         "./mnist/train-labels.idx1-ubyte"
