@@ -44,6 +44,7 @@
 use crate::layer::{Layer, ActivationType};
 use crate::tensor::Tensor;
 
+
 pub struct MLP {
     pub layers: Vec<Layer>,
     pub nb_threads: usize,

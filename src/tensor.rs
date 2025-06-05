@@ -331,4 +331,71 @@ impl Tensor {
         diff.scale(2.0 / (self.rows * self.cols) as f64)
     }
 
+    pub fn softmax(&self) -> Tensor {
+        let mut data = vec![0.0; (self.rows * self.cols) as usize];
+        
+        for r in 0..self.rows {
+            // Find max value in the row for numerical stability
+            let mut max_val = f64::NEG_INFINITY;
+            for c in 0..self.cols {
+                let idx = (r * self.cols + c) as usize;
+                if self.data[idx] > max_val {
+                    max_val = self.data[idx];
+                }
+            }
+            
+            // Compute exponentials and sum
+            let mut sum = 0.0;
+            for c in 0..self.cols {
+                let idx = (r * self.cols + c) as usize;
+                let exp_val = (self.data[idx] - max_val).exp();
+                data[idx] = exp_val;
+                sum += exp_val;
+            }
+            
+            // Normalize by sum
+            for c in 0..self.cols {
+                let idx = (r * self.cols + c) as usize;
+                data[idx] /= sum;
+            }
+        }
+        
+        Tensor::new(data, self.rows, self.cols)
+    }
+
+    pub fn softmax_derivative(&self) -> Tensor {
+        let softmax_vals = self.softmax();
+        let ones = Tensor::ones(self.rows, self.cols);
+        let one_minus_softmax = &ones - &softmax_vals;
+        softmax_vals.hadamard(&one_minus_softmax)
+    }
+
+    pub fn categorical_cross_entropy(&self, targets: &Tensor) -> f64 {
+        assert_eq!(self.rows, targets.rows, "Batch size mismatch");
+        assert_eq!(self.cols, targets.cols, "Number of classes mismatch");
+        
+        let mut total_loss = 0.0;
+        let epsilon = 1e-15; // Small value to prevent log(0)
+        
+        for r in 0..self.rows {
+            let mut row_loss = 0.0;
+            for c in 0..self.cols {
+                let idx = (r * self.cols + c) as usize;
+                let pred = self.data[idx].max(epsilon).min(1.0 - epsilon); // Clip to prevent log(0)
+                row_loss -= targets.data[idx] * pred.ln();
+            }
+            total_loss += row_loss;
+        }
+        
+        total_loss / self.rows as f64
+    }
+
+    pub fn categorical_cross_entropy_derivative(&self, targets: &Tensor) -> Tensor {
+        assert_eq!(self.rows, targets.rows, "Batch size mismatch");
+        assert_eq!(self.cols, targets.cols, "Number of classes mismatch");
+        
+        let diff = self - targets;
+        diff.scale(1.0 / self.rows as f64) // Average over batch
+    }
+
 }
