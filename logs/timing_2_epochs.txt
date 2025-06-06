@@ -1,0 +1,2 @@
+epochs: 2
+trianing_time: 172.94s

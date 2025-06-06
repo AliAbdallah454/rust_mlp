@@ -1,0 +1,6 @@
+epochs: 20
+data_size: 15000
+train_ratio: 0.8
+
+Accuracy on training set: 91.33%
+Accuracy on testing set: 90.67%

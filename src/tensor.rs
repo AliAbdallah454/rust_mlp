@@ -89,7 +89,6 @@ impl Tensor {
     }
 
     pub fn dims(&self) -> (u32, u32) {
-        // println!("({}, {})", self.rows, self.cols)
         (self.rows, self.cols)
     }
 
@@ -229,13 +228,25 @@ impl Tensor {
         Tensor::new(result, r1 as u32, c2 as u32)
     }
 
-    /// Returns a new Tensor where each element is squared (elementwise square)
     pub fn square(&self) -> Tensor {
         let data = self.data.iter().map(|x| x * x).collect();
         Tensor::new(data, self.rows, self.cols)
     }
 
-    // Element wise multiplication
+    pub fn argmax(&self) -> usize {
+        assert_eq!(self.cols, 1, "argmax only works on column vectors (rx1 tensors)");
+        let mut max_idx = 0;
+        let mut max_val = self.data[0];
+        for (i, &val) in self.data.iter().enumerate() {
+            if val > max_val {
+                max_val = val;
+                max_idx = i;
+            }
+        }
+        max_idx
+    }
+
+    // Element wise multiplication (i saw that the element wise mulitplication is called hadamard multiplication hence the name :) )
     pub fn hadamard(&self, other: &Tensor) -> Tensor {
         assert_eq!(self.rows, other.rows, "Tensor hadamard: row mismatch");
         assert_eq!(self.cols, other.cols, "Tensor hadamard: col mismatch");
@@ -244,7 +255,6 @@ impl Tensor {
         Tensor::new(data, self.rows, self.cols)
     }
 
-    /// Apply ReLU activation function
     pub fn relu(&self) -> Tensor {
         let data = self.data.iter().map(|&x| if x > 0.0 { x } else { 0.0 }).collect();
         Tensor::new(data, self.rows, self.cols)
@@ -256,7 +266,6 @@ impl Tensor {
         Tensor::new(data, self.rows, self.cols)
     }
 
-    /// Apply sigmoid activation function
     pub fn sigmoid(&self) -> Tensor {
         let data = self.data.iter().map(|&x| 1.0 / (1.0 + (-x).exp())).collect();
         Tensor::new(data, self.rows, self.cols)
@@ -270,7 +279,6 @@ impl Tensor {
         sigmoid_vals.hadamard(&one_minus_sigmoid)
     }
 
-    /// Apply tanh activation function
     pub fn tanh(&self) -> Tensor {
         let data = self.data.iter().map(|&x| x.tanh()).collect();
         Tensor::new(data, self.rows, self.cols)
@@ -285,12 +293,15 @@ impl Tensor {
     }
 
     pub fn softmax(&self) -> Tensor {
+        assert_eq!(self.cols, 1, "Softmax only implemented for column vectors (r x 1)");
+
         let exp_vals: Vec<f64> = self.data.iter().map(|&x| x.exp()).collect();
         let sum: f64 = exp_vals.iter().sum();
         let data: Vec<f64> = exp_vals.iter().map(|&x| x / sum).collect();
         Tensor::new(data, self.rows, self.cols)
     }
 
+    // to get the derivative of the softmax we need to calculate its Jacobian Matrix
     pub fn softmax_derivative(&self) -> Tensor {
         assert_eq!(self.cols, 1, "Softmax derivative only implemented for column vectors (r x 1)");
     
@@ -314,19 +325,16 @@ impl Tensor {
         Tensor::new(jacobian, len as u32, len as u32) // Jacobian is (r x r)
     }
 
-    /// Create tensor filled with ones
     pub fn ones(rows: u32, cols: u32) -> Tensor {
         let data = vec![1.0; (rows * cols) as usize];
         Tensor::new(data, rows, cols)
     }
 
-    /// Create tensor filled with zeros
     pub fn zeros(rows: u32, cols: u32) -> Tensor {
         let data = vec![0.0; (rows * cols) as usize];
         Tensor::new(data, rows, cols)
     }
 
-    /// Transpose the tensor
     pub fn transpose(&self) -> Tensor {
         let mut data = vec![0.0; (self.rows * self.cols) as usize];
         for i in 0..self.rows {
@@ -337,30 +345,27 @@ impl Tensor {
         Tensor::new(data, self.cols, self.rows)
     }
 
-    /// Multiply by scalar
     pub fn scale(&self, scalar: f64) -> Tensor {
         let data = self.data.iter().map(|&x| x * scalar).collect();
         Tensor::new(data, self.rows, self.cols)
     }
 
-    /// Sum all elements in the tensor
     pub fn sum(&self) -> f64 {
         self.data.iter().sum()
     }
 
-    /// Mean squared error loss
     pub fn mse_loss(&self, target: &Tensor) -> f64 {
         let diff = self - target;
         let squared = diff.square();
         squared.sum() / (self.rows * self.cols) as f64
     }
 
-    /// MSE loss derivative
     pub fn mse_loss_derivative(&self, target: &Tensor) -> Tensor {
         let diff = self - target;
         diff.scale(2.0 / (self.rows * self.cols) as f64)
     }
 
+    // sum of -y*log(y_hat)
     pub fn categorical_cross_entropy(&self, targets: &Tensor) -> f64 {
         assert_eq!(self.rows, targets.rows, "Batch size mismatch");
         assert_eq!(self.cols, targets.cols, "Class count mismatch");
@@ -374,9 +379,10 @@ impl Tensor {
             total_loss -= y_true * y_pred.ln();
         }
     
-        total_loss / self.rows as f64 // Mean loss over batch
+        total_loss / self.rows as f64 // Can be changed ...
     }
     
+    // softmax - y
     pub fn categorical_cross_entropy_derivative(&self, targets: &Tensor) -> Tensor {
         assert_eq!(self.rows, targets.rows, "Batch size mismatch");
         assert_eq!(self.cols, targets.cols, "Class count mismatch");
@@ -384,7 +390,7 @@ impl Tensor {
 
         // self: softmax output, targets: one-hot labels
         let diff = self - targets;
-        diff.scale(1.0 / self.rows as f64) // Mean derivative over batch
+        diff.scale(1.0 / self.rows as f64) // Can be changed ...
     }
 
 }

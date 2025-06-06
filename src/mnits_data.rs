@@ -59,7 +59,7 @@ impl MnistData {
         let rows = u32::from_be_bytes(rows_bytes) as usize;
         let cols = u32::from_be_bytes(cols_bytes) as usize;
         
-        println!("Loading {} images of size {}x{}", num_images, rows, cols);
+        // println!("Loading {} images of size {}x{}", num_images, rows, cols);
         
         let mut images = Vec::with_capacity(num_images);
         let image_size = rows * cols;
@@ -77,9 +77,9 @@ impl MnistData {
             images.push(image);
             
             // Progress indicator for every 10000 images
-            if (i + 1) % 10000 == 0 {
-                println!("Loaded {} images", i + 1);
-            }
+            // if (i + 1) % 10000 == 0 {
+            //     println!("Loaded {} images", i + 1);
+            // }
         }
         
         Ok(images)
@@ -110,7 +110,7 @@ impl MnistData {
             .map_err(|e| format!("Failed to read number of labels: {}", e))?;
         let num_labels = u32::from_be_bytes(num_labels_bytes) as usize;
         
-        println!("Loading {} labels", num_labels);
+        // println!("Loading {} labels", num_labels);
         
         let mut labels = vec![0u8; num_labels];
         reader.read_exact(&mut labels)

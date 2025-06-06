@@ -1,21 +1,3 @@
-// use crate::tensor::Tensor;
-
-// pub struct Layer {
-//     pub weights: Tensor,
-// }
-
-// impl Layer {
-//     pub fn new(rows: u32, cols: u32, seed: u64) -> Self {
-//         Self { weights: Tensor::random(rows, cols, seed) }
-//     }
-
-//     pub fn forward(&self, input: &Tensor, nb_threads: usize) -> Tensor {
-//         self.weights.mul_par(input, nb_threads)
-//     }
-    
-// }
-
-
 use crate::tensor::Tensor;
 
 #[derive(Clone, Debug)]
@@ -24,7 +6,7 @@ pub enum ActivationType {
     Sigmoid,
     Linear,
     Tanh,
-    // Softmax
+    Softmax
 }
 
 pub struct Layer {
@@ -38,7 +20,7 @@ pub struct Layer {
 
 impl Layer {
     pub fn new(input_size: u32, output_size: u32, activation: ActivationType, seed: u64) -> Self {
-        // Xavier initialization
+
         let scale = (2.0 / input_size as f64).sqrt();
         let mut weights = Tensor::random(output_size, input_size, seed);
         weights = weights.scale(scale);
@@ -56,67 +38,58 @@ impl Layer {
     }
 
     pub fn forward(&mut self, input: &Tensor, nb_threads: usize) -> Tensor {
-        // Store input for backpropagation
+
         self.last_input = Some(input.clone());
         
         // Compute z = W * x + b
         let z = self.weights.mul_par(input, nb_threads);
         let z_with_bias = &z + &self.biases;
         
-        // println!("Layer pre-activation (first few values): {:?}", 
-        //     &z_with_bias.data[0..std::cmp::min(5, z_with_bias.data.len())]
-        // );
-        
-        // Store pre-activation for backpropagation
         self.last_pre_activation = Some(z_with_bias.clone());
         
-        // Apply activation function
         let output = match self.activation {
             ActivationType::ReLU => z_with_bias.relu(),
             ActivationType::Sigmoid => z_with_bias.sigmoid(),
             ActivationType::Linear => z_with_bias,
             ActivationType::Tanh => z_with_bias.tanh(),
-            // ActivationType::Softmax => z_with_bias.softmax()
+            ActivationType::Softmax => z_with_bias.softmax()
         };
         
-        // println!("Layer post-activation (first few values): {:?}", 
-        //     &output.data[0..std::cmp::min(5, output.data.len())]
-        // );
-        
-        // Store output for backpropagation
         self.last_output = Some(output.clone());
         
         output
     }
 
     pub fn backward(&self, gradient: &Tensor) -> (Tensor, Tensor, Tensor) {
+
         let input = self.last_input.as_ref().expect("Forward pass must be called before backward");
         let pre_activation = self.last_pre_activation.as_ref().expect("Forward pass must be called before backward");
         
-        println!("Backward pass dimensions:");
-        println!("  Gradient: {:?}", gradient.dims());
-        println!("  Input: {:?}", input.dims());
-        println!("  Pre-activation: {:?}", pre_activation.dims());
-        
-        // Compute activation derivative
         let activation_derivative = match self.activation {
             ActivationType::ReLU => pre_activation.relu_derivative(),
             ActivationType::Sigmoid => pre_activation.sigmoid_derivative(),
             ActivationType::Linear => Tensor::ones(pre_activation.rows, pre_activation.cols),
             ActivationType::Tanh => pre_activation.tanh_derivative(),
-            // ActivationType::Softmax => pre_activation.softmax_derivative()
+            ActivationType::Softmax => pre_activation.softmax_derivative()
         };
         
-        println!("  Activation derivative: {:?}", activation_derivative.dims());
-        
-        // Gradient w.r.t. pre-activation: dL/dz = dL/da * da/dz
-        let dz = gradient.hadamard(&activation_derivative);
-        
+
+        // For Softmax, the derivative is a Jacobian, so we need to do a matrix-vector product
+        // dL/dz = dL/da * da/dz (we have dL/da and da/dz)
+        let dz = match self.activation {
+            ActivationType::Softmax => {
+                activation_derivative.mul_par(gradient, 1)
+            },
+            _ => {
+                gradient.hadamard(&activation_derivative)
+            }
+        }.clone();
+
         // Gradient w.r.t. weights: dL/dW = dL/dz * x^T
         let input_t = input.transpose();
         let dw = dz.mul_par(&input_t, 1);
         
-        // Gradient w.r.t. biases: dL/db = dL/dz (sum over batch dimension if needed)
+        // Gradient w.r.t. biases: dL/db = dL/dz
         let db = dz.clone();
         
         // Gradient w.r.t. input: dL/dx = W^T * dL/dz
@@ -127,6 +100,7 @@ impl Layer {
     }
 
     pub fn update_weights(&mut self, dw: &Tensor, db: &Tensor, learning_rate: f64) {
+
         // Update weights: W = W - lr * dW
         let weight_update = dw.scale(learning_rate);
         self.weights = &self.weights - &weight_update;
