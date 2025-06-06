@@ -21,6 +21,7 @@ pub struct Layer {
 impl Layer {
     pub fn new(input_size: u32, output_size: u32, activation: ActivationType, seed: u64) -> Self {
 
+        // Xavier Initialization
         let scale = (2.0 / input_size as f64).sqrt();
         let mut weights = Tensor::random(output_size, input_size, seed);
         weights = weights.scale(scale);

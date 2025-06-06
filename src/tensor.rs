@@ -70,6 +70,7 @@ impl Tensor {
     pub fn random(rows: u32, cols: u32, seed: u64) -> Self {
         use rand::SeedableRng;
         let mut rng = Pcg64::seed_from_u64(seed);
+        // can be changed to be from -1.0 to 1.0 later
         let uniform = Uniform::new(0.0, 1.0);
         let data = (0..rows * cols)
             .map(|_| uniform.sample(&mut rng))
