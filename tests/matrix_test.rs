@@ -31,8 +31,8 @@ fn test_basic_matrix_multiplication() {
     let expected = create_test_tensor(vec![19.0, 22.0, 43.0, 50.0], 2, 2);
     
     let result_seq = a.mul_seq(&b);
-    let result_par_1 = a.mul_par(&b, 1);
-    let result_par_2 = a.mul_par(&b, 2);
+    let result_par_1 = a.mul(&b);
+    let result_par_2 = a.mul(&b);
     
     assert!(tensors_equal(&result_seq, &expected, EPSILON));
     assert!(tensors_equal(&result_par_1, &expected, EPSILON));
@@ -52,7 +52,7 @@ fn test_identity_matrix_multiplication() {
     let identity = create_test_tensor(vec![1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0], 3, 3);
     
     let result_seq = a.mul_seq(&identity);
-    let result_par = a.mul_par(&identity, 2);
+    let result_par = a.mul(&identity);
     
     assert!(tensors_equal(&result_seq, &a, EPSILON));
     assert!(tensors_equal(&result_par, &a, EPSILON));
@@ -72,7 +72,7 @@ fn test_zero_matrix_multiplication() {
     let expected_zero = create_test_tensor(vec![0.0, 0.0, 0.0, 0.0], 2, 2);
     
     let result_seq = a.mul_seq(&zero);
-    let result_par = a.mul_par(&zero, 2);
+    let result_par = a.mul(&zero);
     
     assert!(tensors_equal(&result_seq, &expected_zero, EPSILON));
     assert!(tensors_equal(&result_par, &expected_zero, EPSILON));
@@ -92,7 +92,7 @@ fn test_single_element_matrices() {
     let expected = create_test_tensor(vec![12.0], 1, 1);
     
     let result_seq = a.mul_seq(&b);
-    let result_par = a.mul_par(&b, 1);
+    let result_par = a.mul(&b);
     
     assert!(tensors_equal(&result_seq, &expected, EPSILON));
     assert!(tensors_equal(&result_par, &expected, EPSILON));
@@ -118,9 +118,9 @@ fn test_rectangular_matrices() {
     );
     
     let result_seq = a.mul_seq(&b);
-    let result_par_1 = a.mul_par(&b, 1);
-    let result_par_2 = a.mul_par(&b, 2);
-    let result_par_3 = a.mul_par(&b, 3);
+    let result_par_1 = a.mul(&b);
+    let result_par_2 = a.mul(&b);
+    let result_par_3 = a.mul(&b);
     
     assert!(tensors_equal(&result_seq, &expected, EPSILON));
     assert!(tensors_equal(&result_par_1, &expected, EPSILON));
@@ -146,7 +146,7 @@ fn test_vector_multiplication() {
     let expected = create_test_tensor(vec![14.0, 32.0, 50.0], 3, 1);
     
     let result_seq = matrix.mul_seq(&vector);
-    let result_par = matrix.mul_par(&vector, 2);
+    let result_par = matrix.mul(&vector);
     
     assert!(tensors_equal(&result_seq, &expected, EPSILON));
     assert!(tensors_equal(&result_par, &expected, EPSILON));
@@ -166,7 +166,7 @@ fn test_row_vector_multiplication() {
     let expected = create_test_tensor(vec![22.0, 28.0], 1, 2);
     
     let result_seq = row_vector.mul_seq(&matrix);
-    let result_par = row_vector.mul_par(&matrix, 1);
+    let result_par = row_vector.mul(&matrix);
     
     assert!(tensors_equal(&result_seq, &expected, EPSILON));
     assert!(tensors_equal(&result_par, &expected, EPSILON));
@@ -186,9 +186,9 @@ fn test_large_matrices() {
     let b = Tensor::random(size, size, 123);
     
     let result_seq = a.mul_seq(&b);
-    let result_par_1 = a.mul_par(&b, 1);
-    let result_par_4 = a.mul_par(&b, 4);
-    let result_par_8 = a.mul_par(&b, 8);
+    let result_par_1 = a.mul(&b);
+    let result_par_4 = a.mul(&b);
+    let result_par_8 = a.mul(&b);
     
     assert!(tensors_equal(&result_seq, &result_par_1, 1e-10));
     assert!(tensors_equal(&result_seq, &result_par_4, 1e-10));
@@ -212,8 +212,8 @@ fn test_non_square_large_matrices() {
     let b = Tensor::random(75, 60, 123);
     
     let result_seq = a.mul_seq(&b);
-    let result_par_2 = a.mul_par(&b, 2);
-    let result_par_5 = a.mul_par(&b, 5);
+    let result_par_2 = a.mul(&b);
+    let result_par_5 = a.mul(&b);
     
     assert!(tensors_equal(&result_seq, &result_par_2, 1e-10));
     assert!(tensors_equal(&result_seq, &result_par_5, 1e-10));
@@ -234,7 +234,7 @@ fn test_thread_count_edge_cases() {
     let b = create_test_tensor(vec![5.0, 6.0, 7.0, 8.0], 2, 2);
     let expected = create_test_tensor(vec![19.0, 22.0, 43.0, 50.0], 2, 2);
     
-    let result_par_10 = a.mul_par(&b, 10); // More threads than rows
+    let result_par_10 = a.mul(&b); // More threads than rows
     assert!(tensors_equal(&result_par_10, &expected, EPSILON));
     
     #[cfg(target_arch = "x86_64")]
@@ -252,7 +252,7 @@ fn test_negative_values() {
     let expected = create_test_tensor(vec![9.0, -10.0, 13.0, -14.0], 2, 2);
     
     let result_seq = a.mul_seq(&b);
-    let result_par = a.mul_par(&b, 2);
+    let result_par = a.mul(&b);
     
     assert!(tensors_equal(&result_seq, &expected, EPSILON));
     assert!(tensors_equal(&result_par, &expected, EPSILON));
@@ -272,7 +272,7 @@ fn test_fractional_values() {
     let expected = create_test_tensor(vec![2.0, 3.0, 5.0, 8.0], 2, 2);
     
     let result_seq = a.mul_seq(&b);
-    let result_par = a.mul_par(&b, 2);
+    let result_par = a.mul(&b);
     
     assert!(tensors_equal(&result_seq, &expected, EPSILON));
     assert!(tensors_equal(&result_par, &expected, EPSILON));
@@ -297,7 +297,7 @@ fn test_incompatible_dimensions_seq() {
 fn test_incompatible_dimensions_par() {
     let a = create_test_tensor(vec![1.0, 2.0, 3.0, 4.0], 2, 2);
     let b = create_test_tensor(vec![1.0, 2.0, 3.0], 3, 1);
-    a.mul_par(&b, 2); // Should panic: 2x2 * 3x1 is invalid
+    a.mul(&b); // Should panic: 2x2 * 3x1 is invalid
 }
 
 #[test]
@@ -339,8 +339,8 @@ fn test_consistency_across_implementations() {
         let b = Tensor::random(c1, c2, 123);
         
         let result_seq = a.mul_seq(&b);
-        let result_par_1 = a.mul_par(&b, 1);
-        let result_par_2 = a.mul_par(&b, 2);
+        let result_par_1 = a.mul(&b);
+        let result_par_2 = a.mul(&b);
         
         assert!(tensors_equal(&result_seq, &result_par_1, 1e-12));
         assert!(tensors_equal(&result_seq, &result_par_2, 1e-12));
@@ -367,7 +367,7 @@ fn test_performance_comparison() {
     let seq_time = start.elapsed();
     
     let start = Instant::now();
-    let _result_par = a.mul_par(&b, 4);
+    let _result_par = a.mul(&b);
     let par_time = start.elapsed();
     
     #[cfg(target_arch = "x86_64")]

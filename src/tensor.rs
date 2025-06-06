@@ -159,7 +159,7 @@ impl Tensor {
         Tensor::new_with_concurrent(result, r1 as u32, c2 as u32, self.concurrent)
     }
 
-    pub fn mul_par(&self, matrix: &Tensor) -> Tensor {
+    fn mul_par(&self, matrix: &Tensor) -> Tensor {
         let c1 = self.cols as usize;
         let r1 = self.rows as usize;
         let c2 = matrix.cols as usize;
@@ -376,6 +376,7 @@ impl Tensor {
         Tensor::new_with_concurrent(data, self.rows, self.cols, self.concurrent)
     }
 
+    
     pub fn sigmoid(&self) -> Tensor {
         let data = if self.concurrent {
             self.data.par_iter().map(|&x| 1.0 / (1.0 + (-x).exp())).collect()
