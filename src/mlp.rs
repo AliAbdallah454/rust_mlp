@@ -13,13 +13,13 @@ pub enum LossFunction {
 
 pub struct MLP {
     pub layers: Vec<Layer>,
-    pub nb_threads: usize,
+    pub concurrent: bool,
     pub learning_rate: f64,
     pub loss_function: LossFunction 
 }
 
 impl MLP {
-    pub fn new(layer_sizes: Vec<u32>, activations: Vec<ActivationType>, loss_function: LossFunction, learning_rate: f64, nb_threads: usize, seed: u64) -> Self {
+    pub fn new(layer_sizes: Vec<u32>, activations: Vec<ActivationType>, loss_function: LossFunction, learning_rate: f64, concurrent: bool, seed: u64) -> Self {
         assert_eq!(layer_sizes.len() - 1, activations.len(), "Number of activations must match number of layers");
         
         let mut layers = Vec::new();
@@ -30,6 +30,7 @@ impl MLP {
                 layer_sizes[i], 
                 layer_sizes[i + 1], 
                 activations[i].clone(),
+                concurrent,
                 current_seed
             );
             layers.push(layer);
@@ -38,7 +39,7 @@ impl MLP {
         
         MLP {
             layers,
-            nb_threads,
+            concurrent,
             learning_rate,
             loss_function,
         }
@@ -46,9 +47,10 @@ impl MLP {
 
     pub fn forward(&mut self, input: &Tensor) -> Tensor {
         let mut current_input = input.clone();
-        
+        current_input.set_concurrent(self.concurrent);
+
         for (i, layer) in &mut self.layers.iter_mut().enumerate() {
-            current_input = layer.forward(&current_input, self.nb_threads);
+            current_input = layer.forward(&current_input);
         }
         current_input
     }
@@ -66,6 +68,7 @@ impl MLP {
                 prediction.categorical_cross_entropy_derivative(target)
             ),
         };
+        gradient.set_concurrent(self.concurrent);
 
         // Backpropagate through layers in reverse order
         let mut weight_gradients = Vec::new();
@@ -122,166 +125,166 @@ impl MLP {
     }
 }
 
-impl MLP {
-    /// Save the entire MLP (weights, biases, architecture, hyperparameters) to a file
-    pub fn save<P: AsRef<Path>>(&self, path: P) -> std::io::Result<()> {
-        let file = File::create(path)?;
-        let mut writer = BufWriter::new(file);
+// impl MLP {
+//     /// Save the entire MLP (weights, biases, architecture, hyperparameters) to a file
+//     pub fn save<P: AsRef<Path>>(&self, path: P) -> std::io::Result<()> {
+//         let file = File::create(path)?;
+//         let mut writer = BufWriter::new(file);
         
-        // Write MLP metadata
-        writeln!(writer, "MLP_SAVE_FORMAT_V1")?;
-        writeln!(writer, "{}", self.layers.len())?;
-        writeln!(writer, "{}", self.nb_threads)?;
-        writeln!(writer, "{:.17}", self.learning_rate)?; // High precision for f64
+//         // Write MLP metadata
+//         writeln!(writer, "MLP_SAVE_FORMAT_V1")?;
+//         writeln!(writer, "{}", self.layers.len())?;
+//         writeln!(writer, "{}", self.nb_threads)?;
+//         writeln!(writer, "{:.17}", self.learning_rate)?; // High precision for f64
         
-        // Write loss function
-        match self.loss_function {
-            LossFunction::MSE => writeln!(writer, "MSE")?,
-            LossFunction::CategoricalCrossEntropy => writeln!(writer, "CategoricalCrossEntropy")?,
-        }
+//         // Write loss function
+//         match self.loss_function {
+//             LossFunction::MSE => writeln!(writer, "MSE")?,
+//             LossFunction::CategoricalCrossEntropy => writeln!(writer, "CategoricalCrossEntropy")?,
+//         }
         
-        // Write each layer
-        for layer in &self.layers {
-            // Write layer metadata
-            writeln!(writer, "{} {}", layer.weights.rows, layer.weights.cols)?;
+//         // Write each layer
+//         for layer in &self.layers {
+//             // Write layer metadata
+//             writeln!(writer, "{} {}", layer.weights.rows, layer.weights.cols)?;
             
-            // Write activation type
-            match layer.activation {
-                ActivationType::ReLU => writeln!(writer, "ReLU")?,
-                ActivationType::Sigmoid => writeln!(writer, "Sigmoid")?,
-                ActivationType::Linear => writeln!(writer, "Linear")?,
-                ActivationType::Tanh => writeln!(writer, "Tanh")?,
-                ActivationType::Softmax => writeln!(writer, "Softmax")?,
-            }
+//             // Write activation type
+//             match layer.activation {
+//                 ActivationType::ReLU => writeln!(writer, "ReLU")?,
+//                 ActivationType::Sigmoid => writeln!(writer, "Sigmoid")?,
+//                 ActivationType::Linear => writeln!(writer, "Linear")?,
+//                 ActivationType::Tanh => writeln!(writer, "Tanh")?,
+//                 ActivationType::Softmax => writeln!(writer, "Softmax")?,
+//             }
             
-            // Write weights
-            for &weight in &layer.weights.data {
-                writeln!(writer, "{:.17}", weight)?;
-            }
+//             // Write weights
+//             for &weight in &layer.weights.data {
+//                 writeln!(writer, "{:.17}", weight)?;
+//             }
             
-            // Write biases
-            for &bias in &layer.biases.data {
-                writeln!(writer, "{:.17}", bias)?;
-            }
-        }
+//             // Write biases
+//             for &bias in &layer.biases.data {
+//                 writeln!(writer, "{:.17}", bias)?;
+//             }
+//         }
         
-        writer.flush()?;
-        Ok(())
-    }
+//         writer.flush()?;
+//         Ok(())
+//     }
     
-    /// Load an MLP from a file
-    pub fn load<P: AsRef<Path>>(path: P) -> std::io::Result<Self> {
-        let file = File::open(path)?;
-        let mut reader = BufReader::new(file);
-        let mut content = String::new();
-        reader.read_to_string(&mut content)?;
+//     /// Load an MLP from a file
+//     pub fn load<P: AsRef<Path>>(path: P) -> std::io::Result<Self> {
+//         let file = File::open(path)?;
+//         let mut reader = BufReader::new(file);
+//         let mut content = String::new();
+//         reader.read_to_string(&mut content)?;
         
-        let mut lines = content.lines();
+//         let mut lines = content.lines();
         
-        // Check format version
-        let format = lines.next().ok_or_else(|| {
-            std::io::Error::new(std::io::ErrorKind::InvalidData, "Missing format version")
-        })?;
+//         // Check format version
+//         let format = lines.next().ok_or_else(|| {
+//             std::io::Error::new(std::io::ErrorKind::InvalidData, "Missing format version")
+//         })?;
         
-        if format != "MLP_SAVE_FORMAT_V1" {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::InvalidData,
-                "Unsupported file format"
-            ));
-        }
+//         if format != "MLP_SAVE_FORMAT_V1" {
+//             return Err(std::io::Error::new(
+//                 std::io::ErrorKind::InvalidData,
+//                 "Unsupported file format"
+//             ));
+//         }
         
-        // Read MLP metadata
-        let num_layers: usize = lines.next()
-            .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::InvalidData, "Missing layer count"))?
-            .parse()
-            .map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidData, "Invalid layer count"))?;
+//         // Read MLP metadata
+//         let num_layers: usize = lines.next()
+//             .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::InvalidData, "Missing layer count"))?
+//             .parse()
+//             .map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidData, "Invalid layer count"))?;
         
-        let nb_threads: usize = lines.next()
-            .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::InvalidData, "Missing thread count"))?
-            .parse()
-            .map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidData, "Invalid thread count"))?;
+//         let nb_threads: usize = lines.next()
+//             .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::InvalidData, "Missing thread count"))?
+//             .parse()
+//             .map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidData, "Invalid thread count"))?;
         
-        let learning_rate: f64 = lines.next()
-            .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::InvalidData, "Missing learning rate"))?
-            .parse()
-            .map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidData, "Invalid learning rate"))?;
+//         let learning_rate: f64 = lines.next()
+//             .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::InvalidData, "Missing learning rate"))?
+//             .parse()
+//             .map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidData, "Invalid learning rate"))?;
         
-        // Read loss function
-        let loss_function = match lines.next()
-            .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::InvalidData, "Missing loss function"))? {
-            "MSE" => LossFunction::MSE,
-            "CategoricalCrossEntropy" => LossFunction::CategoricalCrossEntropy,
-            _ => return Err(std::io::Error::new(std::io::ErrorKind::InvalidData, "Invalid loss function")),
-        };
+//         // Read loss function
+//         let loss_function = match lines.next()
+//             .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::InvalidData, "Missing loss function"))? {
+//             "MSE" => LossFunction::MSE,
+//             "CategoricalCrossEntropy" => LossFunction::CategoricalCrossEntropy,
+//             _ => return Err(std::io::Error::new(std::io::ErrorKind::InvalidData, "Invalid loss function")),
+//         };
         
-        // Read layers
-        let mut layers = Vec::new();
+//         // Read layers
+//         let mut layers = Vec::new();
         
-        for _ in 0..num_layers {
-            // Read layer dimensions
-            let dims_line = lines.next()
-                .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::InvalidData, "Missing layer dimensions"))?;
-            let dims: Vec<&str> = dims_line.split_whitespace().collect();
-            if dims.len() != 2 {
-                return Err(std::io::Error::new(std::io::ErrorKind::InvalidData, "Invalid layer dimensions"));
-            }
+//         for _ in 0..num_layers {
+//             // Read layer dimensions
+//             let dims_line = lines.next()
+//                 .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::InvalidData, "Missing layer dimensions"))?;
+//             let dims: Vec<&str> = dims_line.split_whitespace().collect();
+//             if dims.len() != 2 {
+//                 return Err(std::io::Error::new(std::io::ErrorKind::InvalidData, "Invalid layer dimensions"));
+//             }
             
-            let rows: u32 = dims[0].parse()
-                .map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidData, "Invalid weight rows"))?;
-            let cols: u32 = dims[1].parse()
-                .map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidData, "Invalid weight cols"))?;
+//             let rows: u32 = dims[0].parse()
+//                 .map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidData, "Invalid weight rows"))?;
+//             let cols: u32 = dims[1].parse()
+//                 .map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidData, "Invalid weight cols"))?;
             
-            // Read activation type
-            let activation = match lines.next()
-                .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::InvalidData, "Missing activation"))? {
-                "ReLU" => ActivationType::ReLU,
-                "Sigmoid" => ActivationType::Sigmoid,
-                "Linear" => ActivationType::Linear,
-                "Tanh" => ActivationType::Tanh,
-                "Softmax" => ActivationType::Softmax,
-                _ => return Err(std::io::Error::new(std::io::ErrorKind::InvalidData, "Invalid activation")),
-            };
+//             // Read activation type
+//             let activation = match lines.next()
+//                 .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::InvalidData, "Missing activation"))? {
+//                 "ReLU" => ActivationType::ReLU,
+//                 "Sigmoid" => ActivationType::Sigmoid,
+//                 "Linear" => ActivationType::Linear,
+//                 "Tanh" => ActivationType::Tanh,
+//                 "Softmax" => ActivationType::Softmax,
+//                 _ => return Err(std::io::Error::new(std::io::ErrorKind::InvalidData, "Invalid activation")),
+//             };
             
-            // Read weights
-            let mut weights_data = Vec::new();
-            for _ in 0..(rows * cols) {
-                let weight: f64 = lines.next()
-                    .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::InvalidData, "Missing weight data"))?
-                    .parse()
-                    .map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidData, "Invalid weight value"))?;
-                weights_data.push(weight);
-            }
-            let weights = Tensor::new(weights_data, rows, cols);
+//             // Read weights
+//             let mut weights_data = Vec::new();
+//             for _ in 0..(rows * cols) {
+//                 let weight: f64 = lines.next()
+//                     .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::InvalidData, "Missing weight data"))?
+//                     .parse()
+//                     .map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidData, "Invalid weight value"))?;
+//                 weights_data.push(weight);
+//             }
+//             let weights = Tensor::new(weights_data, rows, cols);
             
-            // Read biases
-            let mut biases_data = Vec::new();
-            for _ in 0..rows {
-                let bias: f64 = lines.next()
-                    .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::InvalidData, "Missing bias data"))?
-                    .parse()
-                    .map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidData, "Invalid bias value"))?;
-                biases_data.push(bias);
-            }
-            let biases = Tensor::new(biases_data, rows, 1);
+//             // Read biases
+//             let mut biases_data = Vec::new();
+//             for _ in 0..rows {
+//                 let bias: f64 = lines.next()
+//                     .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::InvalidData, "Missing bias data"))?
+//                     .parse()
+//                     .map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidData, "Invalid bias value"))?;
+//                 biases_data.push(bias);
+//             }
+//             let biases = Tensor::new(biases_data, rows, 1);
             
-            // Create layer
-            let layer = Layer {
-                weights,
-                biases,
-                activation,
-                last_input: None,
-                last_pre_activation: None,
-                last_output: None,
-            };
+//             // Create layer
+//             let layer = Layer {
+//                 weights,
+//                 biases,
+//                 activation,
+//                 last_input: None,
+//                 last_pre_activation: None,
+//                 last_output: None,
+//             };
             
-            layers.push(layer);
-        }
+//             layers.push(layer);
+//         }
         
-        Ok(MLP {
-            layers,
-            nb_threads,
-            learning_rate,
-            loss_function,
-        })
-    }
-}
+//         Ok(MLP {
+//             layers,
+//             nb_threads,
+//             learning_rate,
+//             loss_function,
+//         })
+//     }
+// }

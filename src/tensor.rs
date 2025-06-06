@@ -4,6 +4,8 @@ use std::ops::{Add, Sub};
 use rand_pcg::Pcg64;
 use rand::distributions::{Distribution, Uniform};
 
+use rayon::prelude::*;
+
 #[derive(Clone, Copy)]
 struct RawPointerWrapper {
     raw: *mut f64,
@@ -15,7 +17,8 @@ unsafe impl Send for RawPointerWrapper {}
 pub struct Tensor {
     pub data: Vec<f64>,
     pub rows: u32,
-    pub cols: u32
+    pub cols: u32,
+    pub concurrent: bool
 }
 
 // Overload the + operator for Tensor + Tensor
@@ -25,8 +28,14 @@ impl Add for &Tensor {
     fn add(self, rhs: &Tensor) -> Tensor {
         assert_eq!(self.rows, rhs.rows, "Tensor add: row mismatch");
         assert_eq!(self.cols, rhs.cols, "Tensor add: col mismatch");
-        let data = self.data.iter().zip(rhs.data.iter()).map(|(a, b)| a + b).collect();
-        Tensor::new(data, self.rows, self.cols)
+        
+        let data = if self.concurrent {
+            self.data.par_iter().zip(rhs.data.par_iter()).map(|(a, b)| a + b).collect()
+        } else {
+            self.data.iter().zip(rhs.data.iter()).map(|(a, b)| a + b).collect()
+        };
+        
+        Tensor::new_with_concurrent(data, self.rows, self.cols, self.concurrent)
     }
 }
 
@@ -37,8 +46,14 @@ impl Sub for &Tensor {
     fn sub(self, rhs: &Tensor) -> Tensor {
         assert_eq!(self.rows, rhs.rows, "Tensor sub: row mismatch");
         assert_eq!(self.cols, rhs.cols, "Tensor sub: col mismatch");
-        let data = self.data.iter().zip(rhs.data.iter()).map(|(a, b)| a - b).collect();
-        Tensor::new(data, self.rows, self.cols)
+        
+        let data = if self.concurrent {
+            self.data.par_iter().zip(rhs.data.par_iter()).map(|(a, b)| a - b).collect()
+        } else {
+            self.data.iter().zip(rhs.data.iter()).map(|(a, b)| a - b).collect()
+        };
+        
+        Tensor::new_with_concurrent(data, self.rows, self.cols, self.concurrent)
     }
 }
 
@@ -48,8 +63,15 @@ impl Sub for Tensor {
     fn sub(self, rhs: Tensor) -> Tensor {
         assert_eq!(self.rows, rhs.rows, "Tensor sub: row mismatch");
         assert_eq!(self.cols, rhs.cols, "Tensor sub: col mismatch");
-        let data = self.data.iter().zip(rhs.data.iter()).map(|(a, b)| a - b).collect();
-        Tensor::new(data, self.rows, self.cols)
+        
+        let concurrent = self.concurrent;
+        let data = if concurrent {
+            self.data.par_iter().zip(rhs.data.par_iter()).map(|(a, b)| a - b).collect()
+        } else {
+            self.data.iter().zip(rhs.data.iter()).map(|(a, b)| a - b).collect()
+        };
+        
+        Tensor::new_with_concurrent(data, self.rows, self.cols, concurrent)
     }
 }
 
@@ -59,18 +81,31 @@ impl Tensor {
         Tensor {
             data: data,
             rows: rows,
-            cols: cols
+            cols: cols,
+            concurrent: true
         }
     }
 
+    pub fn new_with_concurrent(data: Vec<f64>, rows: u32, cols: u32, concurrent: bool) -> Tensor {
+        Tensor {
+            data: data,
+            rows: rows,
+            cols: cols,
+            concurrent: concurrent
+        }
+    }
+
+    pub fn set_concurrent(&mut self, val: bool) {
+        self.concurrent = val;
+    }
+
     pub fn scalar(scalar: f64) -> Tensor {
-        Tensor { data: vec![scalar], rows: 1, cols: 1 }
+        Tensor::new(vec![scalar], 1, 1)
     }
 
     pub fn random(rows: u32, cols: u32, seed: u64) -> Self {
         use rand::SeedableRng;
         let mut rng = Pcg64::seed_from_u64(seed);
-        // can be changed to be from -1.0 to 1.0 later
         let uniform = Uniform::new(0.0, 1.0);
         let data = (0..rows * cols)
             .map(|_| uniform.sample(&mut rng))
@@ -101,13 +136,61 @@ impl Tensor {
         }
     }
 
-    #[allow(dead_code)]
     pub fn mul_seq(&self, matrix: &Tensor) -> Tensor {
-        self.mul_par(matrix, 1)
+        let c1 = self.cols as usize;
+        let r1 = self.rows as usize;
+        let c2 = matrix.cols as usize;
+        let r2 = matrix.rows as usize;
+    
+        assert_eq!(c1, r2, "Matrix dimensions don't match: {}x{} * {}x{}", r1, c1, r2, c2);
+    
+        let mut result = vec![0.0; r1 * c2];
+    
+        for i in 0..r1 {
+            for j in 0..c2 {
+                let mut sum = 0.0;
+                for k in 0..c1 {
+                    sum += self.data[i * c1 + k] * matrix.data[k * c2 + j];
+                }
+                result[i * c2 + j] = sum;
+            }
+        }
+    
+        Tensor::new_with_concurrent(result, r1 as u32, c2 as u32, self.concurrent)
+    }
+
+    pub fn mul_par(&self, matrix: &Tensor) -> Tensor {
+        let c1 = self.cols as usize;
+        let r1 = self.rows as usize;
+        let c2 = matrix.cols as usize;
+        let r2 = matrix.rows as usize;
+    
+        assert_eq!(c1, r2, "Matrix dimensions don't match: {}x{} * {}x{}", r1, c1, r2, c2);
+    
+        let result: Vec<f64> = (0..r1)
+            .into_par_iter()
+            .flat_map(|i| {
+                (0..c2).into_par_iter().map(move |j| {
+                    (0..c1)
+                        .map(|k| self.data[i * c1 + k] * matrix.data[k * c2 + j])
+                        .sum()
+                })
+            })
+            .collect();
+    
+        Tensor::new_with_concurrent(result, r1 as u32, c2 as u32, self.concurrent)
+    }
+
+    pub fn mul(&self, matrix: &Tensor) -> Tensor {
+        if self.concurrent {
+            self.mul_par(matrix)
+        } else {
+            self.mul_seq(matrix)
+        }
     }
 
     #[allow(dead_code)]
-    pub fn mul_par(&self, matrix: &Tensor, nb_threads: usize) -> Tensor {
+    pub fn mul_par_old(&self, matrix: &Tensor, nb_threads: usize) -> Tensor {
         let c1 = self.cols as usize;
         let r1 = self.rows as usize;
         let c2 = matrix.cols as usize;
@@ -149,7 +232,7 @@ impl Tensor {
             handle.join().unwrap();
         }
 
-        Tensor::new(result, r1 as u32, c2 as u32)
+        Tensor::new_with_concurrent(result, r1 as u32, c2 as u32, self.concurrent)
     }
 
     #[allow(dead_code)]
@@ -226,25 +309,38 @@ impl Tensor {
                 .collect();
         });
         
-        Tensor::new(result, r1 as u32, c2 as u32)
+        Tensor::new_with_concurrent(result, r1 as u32, c2 as u32, self.concurrent)
     }
 
     pub fn square(&self) -> Tensor {
-        let data = self.data.iter().map(|x| x * x).collect();
-        Tensor::new(data, self.rows, self.cols)
+        let data = if self.concurrent {
+            self.data.par_iter().map(|x| x * x).collect()
+        } else {
+            self.data.iter().map(|x| x * x).collect()
+        };
+        Tensor::new_with_concurrent(data, self.rows, self.cols, self.concurrent)
     }
 
     pub fn argmax(&self) -> usize {
         assert_eq!(self.cols, 1, "argmax only works on column vectors (rx1 tensors)");
-        let mut max_idx = 0;
-        let mut max_val = self.data[0];
-        for (i, &val) in self.data.iter().enumerate() {
-            if val > max_val {
-                max_val = val;
-                max_idx = i;
+        
+        if self.concurrent {
+            self.data.par_iter()
+                .enumerate()
+                .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap())
+                .map(|(i, _)| i)
+                .unwrap_or(0)
+        } else {
+            let mut max_idx = 0;
+            let mut max_val = self.data[0];
+            for (i, &val) in self.data.iter().enumerate() {
+                if val > max_val {
+                    max_val = val;
+                    max_idx = i;
+                }
             }
+            max_idx
         }
-        max_idx
     }
 
     // Element wise multiplication (i saw that the element wise mulitplication is called hadamard multiplication hence the name :) )
@@ -252,43 +348,64 @@ impl Tensor {
         assert_eq!(self.rows, other.rows, "Tensor hadamard: row mismatch");
         assert_eq!(self.cols, other.cols, "Tensor hadamard: col mismatch");
         
-        let data = self.data.iter().zip(other.data.iter()).map(|(a, b)| a * b).collect();
-        Tensor::new(data, self.rows, self.cols)
+        let data = if self.concurrent {
+            self.data.par_iter().zip(other.data.par_iter()).map(|(a, b)| a * b).collect()
+        } else {
+            self.data.iter().zip(other.data.iter()).map(|(a, b)| a * b).collect()
+        };
+        
+        Tensor::new_with_concurrent(data, self.rows, self.cols, self.concurrent)
     }
 
     pub fn relu(&self) -> Tensor {
-        let data = self.data.iter().map(|&x| if x > 0.0 { x } else { 0.0 }).collect();
-        Tensor::new(data, self.rows, self.cols)
+        let data = if self.concurrent {
+            self.data.par_iter().map(|&x| if x > 0.0 { x } else { 0.0 }).collect()
+        } else {
+            self.data.iter().map(|&x| if x > 0.0 { x } else { 0.0 }).collect()
+        };
+        Tensor::new_with_concurrent(data, self.rows, self.cols, self.concurrent)
     }
 
     /// ReLU derivative (1 if x > 0, 0 otherwise)
     pub fn relu_derivative(&self) -> Tensor {
-        let data = self.data.iter().map(|&x| if x > 0.0 { 1.0 } else { 0.0 }).collect();
-        Tensor::new(data, self.rows, self.cols)
+        let data = if self.concurrent {
+            self.data.par_iter().map(|&x| if x > 0.0 { 1.0 } else { 0.0 }).collect()
+        } else {
+            self.data.iter().map(|&x| if x > 0.0 { 1.0 } else { 0.0 }).collect()
+        };
+        Tensor::new_with_concurrent(data, self.rows, self.cols, self.concurrent)
     }
 
     pub fn sigmoid(&self) -> Tensor {
-        let data = self.data.iter().map(|&x| 1.0 / (1.0 + (-x).exp())).collect();
-        Tensor::new(data, self.rows, self.cols)
+        let data = if self.concurrent {
+            self.data.par_iter().map(|&x| 1.0 / (1.0 + (-x).exp())).collect()
+        } else {
+            self.data.iter().map(|&x| 1.0 / (1.0 + (-x).exp())).collect()
+        };
+        Tensor::new_with_concurrent(data, self.rows, self.cols, self.concurrent)
     }
 
     /// Sigmoid derivative: sigmoid(x) * (1 - sigmoid(x))
     pub fn sigmoid_derivative(&self) -> Tensor {
         let sigmoid_vals = self.sigmoid();
-        let ones = Tensor::ones(self.rows, self.cols);
+        let ones = Tensor::ones_with_concurrent(self.rows, self.cols, self.concurrent);
         let one_minus_sigmoid = &ones - &sigmoid_vals;
         sigmoid_vals.hadamard(&one_minus_sigmoid)
     }
 
     pub fn tanh(&self) -> Tensor {
-        let data = self.data.iter().map(|&x| x.tanh()).collect();
-        Tensor::new(data, self.rows, self.cols)
+        let data = if self.concurrent {
+            self.data.par_iter().map(|&x| x.tanh()).collect()
+        } else {
+            self.data.iter().map(|&x| x.tanh()).collect()
+        };
+        Tensor::new_with_concurrent(data, self.rows, self.cols, self.concurrent)
     }
 
     /// Tanh derivative: 1 - tanh(x)^2
     pub fn tanh_derivative(&self) -> Tensor {
         let tanh_vals = self.tanh();
-        let ones = Tensor::ones(self.rows, self.cols);
+        let ones = Tensor::ones_with_concurrent(self.rows, self.cols, self.concurrent);
         let tanh_squared = tanh_vals.hadamard(&tanh_vals);
         &ones - &tanh_squared
     }
@@ -296,10 +413,25 @@ impl Tensor {
     pub fn softmax(&self) -> Tensor {
         assert_eq!(self.cols, 1, "Softmax only implemented for column vectors (r x 1)");
 
-        let exp_vals: Vec<f64> = self.data.iter().map(|&x| x.exp()).collect();
-        let sum: f64 = exp_vals.iter().sum();
-        let data: Vec<f64> = exp_vals.iter().map(|&x| x / sum).collect();
-        Tensor::new(data, self.rows, self.cols)
+        let exp_vals: Vec<f64> = if self.concurrent {
+            self.data.par_iter().map(|&x| x.exp()).collect()
+        } else {
+            self.data.iter().map(|&x| x.exp()).collect()
+        };
+        
+        let sum: f64 = if self.concurrent {
+            exp_vals.par_iter().sum()
+        } else {
+            exp_vals.iter().sum()
+        };
+        
+        let data: Vec<f64> = if self.concurrent {
+            exp_vals.par_iter().map(|&x| x / sum).collect()
+        } else {
+            exp_vals.iter().map(|&x| x / sum).collect()
+        };
+        
+        Tensor::new_with_concurrent(data, self.rows, self.cols, self.concurrent)
     }
 
     // to get the derivative of the softmax we need to calculate its Jacobian Matrix
@@ -308,22 +440,38 @@ impl Tensor {
     
         let softmax = self.softmax();
         let len = softmax.data.len();
-        let mut jacobian = vec![0.0; len * len];
-    
-        for i in 0..len {
-            for j in 0..len {
-                let s_i = softmax.data[i];
-                let s_j = softmax.data[j];
-                let val = if i == j {
-                    s_i * (1.0 - s_i)
-                } else {
-                    -s_i * s_j
-                };
-                jacobian[i * len + j] = val;
+        
+        let jacobian = if self.concurrent {
+            (0..len).into_par_iter().flat_map(|i| {
+                let x = softmax.clone();
+                (0..len).into_par_iter().map(move |j| {
+                    let s_i = x.data[i];
+                    let s_j = x.data[j];
+                    if i == j {
+                        s_i * (1.0 - s_i)
+                    } else {
+                        -s_i * s_j
+                    }
+                })
+            }).collect()
+        } else {
+            let mut jacobian = vec![0.0; len * len];
+            for i in 0..len {
+                for j in 0..len {
+                    let s_i = softmax.data[i];
+                    let s_j = softmax.data[j];
+                    let val = if i == j {
+                        s_i * (1.0 - s_i)
+                    } else {
+                        -s_i * s_j
+                    };
+                    jacobian[i * len + j] = val;
+                }
             }
-        }
+            jacobian
+        };
     
-        Tensor::new(jacobian, len as u32, len as u32) // Jacobian is (r x r)
+        Tensor::new_with_concurrent(jacobian, len as u32, len as u32, self.concurrent)
     }
 
     pub fn ones(rows: u32, cols: u32) -> Tensor {
@@ -331,28 +479,66 @@ impl Tensor {
         Tensor::new(data, rows, cols)
     }
 
+    pub fn ones_with_concurrent(rows: u32, cols: u32, concurrent: bool) -> Tensor {
+        let data = vec![1.0; (rows * cols) as usize];
+        Tensor::new_with_concurrent(data, rows, cols, concurrent)
+    }
+
     pub fn zeros(rows: u32, cols: u32) -> Tensor {
         let data = vec![0.0; (rows * cols) as usize];
         Tensor::new(data, rows, cols)
     }
 
+    pub fn zeros_with_concurrent(rows: u32, cols: u32, concurrent: bool) -> Tensor {
+        let data = vec![0.0; (rows * cols) as usize];
+        Tensor::new_with_concurrent(data, rows, cols, concurrent)
+    }
+
     pub fn transpose(&self) -> Tensor {
-        let mut data = vec![0.0; (self.rows * self.cols) as usize];
-        for i in 0..self.rows {
-            for j in 0..self.cols {
-                data[(j * self.rows + i) as usize] = self.data[(i * self.cols + j) as usize];
+        let size = (self.rows * self.cols) as usize;
+        
+        let data = if self.concurrent && size > 1000 { // Use parallel for larger matrices
+            (0..self.rows).into_par_iter().flat_map(|i| {
+                (0..self.cols).into_par_iter().map(move |j| {
+                    self.data[(i * self.cols + j) as usize]
+                })
+            }).collect::<Vec<_>>()
+            .into_iter()
+            .enumerate()
+            .fold(vec![0.0; size], |mut acc, (idx, val)| {
+                let orig_i = idx / self.cols as usize;
+                let orig_j = idx % self.cols as usize;
+                acc[orig_j * self.rows as usize + orig_i] = val;
+                acc
+            })
+        } else {
+            let mut data = vec![0.0; size];
+            for i in 0..self.rows {
+                for j in 0..self.cols {
+                    data[(j * self.rows + i) as usize] = self.data[(i * self.cols + j) as usize];
+                }
             }
-        }
-        Tensor::new(data, self.cols, self.rows)
+            data
+        };
+        
+        Tensor::new_with_concurrent(data, self.cols, self.rows, self.concurrent)
     }
 
     pub fn scale(&self, scalar: f64) -> Tensor {
-        let data = self.data.iter().map(|&x| x * scalar).collect();
-        Tensor::new(data, self.rows, self.cols)
+        let data = if self.concurrent {
+            self.data.par_iter().map(|&x| x * scalar).collect()
+        } else {
+            self.data.iter().map(|&x| x * scalar).collect()
+        };
+        Tensor::new_with_concurrent(data, self.rows, self.cols, self.concurrent)
     }
 
     pub fn sum(&self) -> f64 {
-        self.data.iter().sum()
+        if self.concurrent {
+            self.data.par_iter().sum()
+        } else {
+            self.data.iter().sum()
+        }
     }
 
     pub fn mse_loss(&self, target: &Tensor) -> f64 {
@@ -372,15 +558,27 @@ impl Tensor {
         assert_eq!(self.cols, targets.cols, "Class count mismatch");
     
         let epsilon = 1e-15; // To prevent log(0)
-        let mut total_loss = 0.0;
+        
+        let total_loss = if self.concurrent {
+            (0..(self.rows * self.cols) as usize)
+                .into_par_iter()
+                .map(|i| {
+                    let y_true = targets.data[i];
+                    let y_pred = self.data[i].max(epsilon).min(1.0 - epsilon); // clip
+                    -y_true * y_pred.ln()
+                })
+                .sum::<f64>()
+        } else {
+            let mut total_loss = 0.0;
+            for i in 0..(self.rows * self.cols) as usize {
+                let y_true = targets.data[i];
+                let y_pred = self.data[i].max(epsilon).min(1.0 - epsilon); // clip
+                total_loss -= y_true * y_pred.ln();
+            }
+            total_loss
+        };
     
-        for i in 0..(self.rows * self.cols) as usize {
-            let y_true = targets.data[i];
-            let y_pred = self.data[i].max(epsilon).min(1.0 - epsilon); // clip
-            total_loss -= y_true * y_pred.ln();
-        }
-    
-        total_loss / self.rows as f64 // Can be changed ...
+        total_loss / self.rows as f64
     }
     
     // softmax - y
@@ -391,7 +589,7 @@ impl Tensor {
 
         // self: softmax output, targets: one-hot labels
         let diff = self - targets;
-        diff.scale(1.0 / self.rows as f64) // Can be changed ...
+        diff.scale(1.0 / self.rows as f64)
     }
 
 }

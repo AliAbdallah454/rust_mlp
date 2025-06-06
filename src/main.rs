@@ -7,6 +7,18 @@ use std::time::Instant;
 
 fn main() {
 
+    // let mut mat1 = Tensor::random(1000, 1000, 42);
+    // let mat2 = Tensor::random(1000, 1000, 43);
+    // let start1 = Instant::now();
+    // mat1.mul_par_old(&mat2, 12);
+    // let duration1 = start1.elapsed();
+    // println!("threaded_mul took: {:?}", duration1);
+
+    // let start2 = Instant::now();
+    // mat1.mul(&mat2);
+    // let duration2 = start2.elapsed();
+    // println!("sequential_mul took: {:?}", duration2);
+
     let train_data_result = MnistData::load_from_files(
         "./mnist/train-images.idx3-ubyte",
         "./mnist/train-labels.idx1-ubyte"
@@ -27,21 +39,21 @@ fn main() {
         labels.push(Tensor::new(one_hot, 10, 1));
     }
 
-    // ----------------------------------------------
+    // // ----------------------------------------------
 
-    // images = images.into_iter().skip(35_000).take(100).collect();
-    // labels = labels.into_iter().skip(35_000).take(100).collect();
+    // // images = images.into_iter().skip(35_000).take(100).collect();
+    // // labels = labels.into_iter().skip(35_000).take(100).collect();
 
-    // images = images.into_iter().skip(15_000).collect();
-    // labels = labels.into_iter().skip(15_000).collect();
+    // // images = images.into_iter().skip(15_000).collect();
+    // // labels = labels.into_iter().skip(15_000).collect();
 
 
-    // let mut mlp = MLP::load("./models/test3.txt").unwrap();
+    // // let mut mlp = MLP::load("./models/test3.txt").unwrap();
 
-    // let testing_accuracy = evaluate_model(&mut mlp, &images, &labels);
-    // println!("Testing set: {:.2}%", testing_accuracy * 100.0);
+    // // let testing_accuracy = evaluate_model(&mut mlp, &images, &labels);
+    // // println!("Testing set: {:.2}%", testing_accuracy * 100.0);
 
-    // ----------------------------------------------
+    // // ----------------------------------------------
 
     images.truncate(15000);
     labels.truncate(15000);
@@ -56,7 +68,7 @@ fn main() {
     let layer_sizes = vec![28*28, 16, 16, 10];
     let activations = vec![ActivationType::ReLU, ActivationType::ReLU, ActivationType::Softmax];
 
-    let mut mlp = MLP::new(layer_sizes, activations, LossFunction::CategoricalCrossEntropy, 0.01, 1, 42);
+    let mut mlp = MLP::new(layer_sizes, activations, LossFunction::CategoricalCrossEntropy, 0.01, false, 42);
 
     println!("Accuracy before training:");
     let training_accuracy = evaluate_model(&mut mlp, &training_images, &training_labels);
@@ -67,7 +79,7 @@ fn main() {
 
     println!("Training started ...");
 
-    let epochs = 2 as usize;
+    let epochs = 1 as usize;
     let train_start = Instant::now();
     mlp.train(&training_images, &training_labels, epochs);
     let train_duration = train_start.elapsed();
@@ -79,6 +91,6 @@ fn main() {
     println!("Accuracy on training set: {:.2}%", training_accuracy * 100.0);
     println!("Accuracy on testing set: {:.2}%", testing_accuracy * 100.0);
 
-    mlp.save("./models/timing_2_epochs.txt").unwrap();
+    // mlp.save("./models/test4_no_normalization.txt").unwrap();
 
 }
