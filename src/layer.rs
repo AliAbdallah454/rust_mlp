@@ -61,7 +61,7 @@ impl Layer {
         output
     }
 
-    pub fn backward(&self, gradient: &Tensor) -> (Tensor, Tensor, Tensor) {
+    pub fn backward(&self, gradient: &Tensor, nb_threads: usize) -> (Tensor, Tensor, Tensor) {
 
         let input = self.last_input.as_ref().expect("Forward pass must be called before backward");
         let pre_activation = self.last_pre_activation.as_ref().expect("Forward pass must be called before backward");
@@ -79,7 +79,7 @@ impl Layer {
         // dL/dz = dL/da * da/dz (we have dL/da and da/dz)
         let dz = match self.activation {
             ActivationType::Softmax => {
-                activation_derivative.mul_par(gradient, 1)
+                activation_derivative.mul_par(gradient, nb_threads)
             },
             _ => {
                 gradient.hadamard(&activation_derivative)
@@ -88,14 +88,14 @@ impl Layer {
 
         // Gradient w.r.t. weights: dL/dW = dL/dz * x^T
         let input_t = input.transpose();
-        let dw = dz.mul_par(&input_t, 1);
+        let dw = dz.mul_par(&input_t, nb_threads);
         
         // Gradient w.r.t. biases: dL/db = dL/dz
         let db = dz.clone();
         
         // Gradient w.r.t. input: dL/dx = W^T * dL/dz
         let weights_t = self.weights.transpose();
-        let dx = weights_t.mul_par(&dz, 1);
+        let dx = weights_t.mul_par(&dz, nb_threads);
         
         (dx, dw, db)
     }

@@ -29,56 +29,77 @@ fn main() {
 
     // ----------------------------------------------
 
-    // images = images.into_iter().skip(35_000).take(100).collect();
-    // labels = labels.into_iter().skip(35_000).take(100).collect();
+    images = images.into_iter().skip(35_000).take(100).collect();
+    labels = labels.into_iter().skip(35_000).take(100).collect();
 
-    // images = images.into_iter().skip(15_000).collect();
-    // labels = labels.into_iter().skip(15_000).collect();
+    let mut mlp = MLP::load("./models/test3.txt").unwrap();
 
+    // Print header
+    println!("Predicted | Actual");
+    println!("------------------");
 
-    // let mut mlp = MLP::load("./models/test3.txt").unwrap();
+    // Evaluate each image and print predictions
+    for (image, label) in images.iter().zip(labels.iter()) {
+        let prediction = mlp.forward(image);
+        
+        // Get predicted class (index of max value)
+        let pred_idx = prediction.data.iter()
+            .enumerate()
+            .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap())
+            .map(|(idx, _)| idx)
+            .unwrap();
+            
+        // Get actual class (index of 1.0 in one-hot vector)
+        let actual_idx = label.data.iter()
+            .enumerate()
+            .find(|(_, &val)| val == 1.0)
+            .map(|(idx, _)| idx)
+            .unwrap();
+            
+        println!("{:8} | {:6}", pred_idx, actual_idx);
+    }
 
-    // let testing_accuracy = evaluate_model(&mut mlp, &images, &labels);
-    // println!("Testing set: {:.2}%", testing_accuracy * 100.0);
+    let testing_accuracy = evaluate_model(&mut mlp, &images, &labels);
+    println!("\nOverall accuracy: {:.2}%", testing_accuracy * 100.0);
 
     // ----------------------------------------------
 
-    images.truncate(15000);
-    labels.truncate(15000);
+    // images.truncate(15000);
+    // labels.truncate(15000);
 
-    let (
-        training_images, 
-        training_labels, 
-        testing_images, 
-        testing_labels
-    ) = split_dataset(images, labels, 0.8);
+    // let (
+    //     training_images, 
+    //     training_labels, 
+    //     testing_images, 
+    //     testing_labels
+    // ) = split_dataset(images, labels, 0.8);
 
-    let layer_sizes = vec![28*28, 16, 16, 10];
-    let activations = vec![ActivationType::ReLU, ActivationType::ReLU, ActivationType::Softmax];
+    // let layer_sizes = vec![28*28, 16, 16, 10];
+    // let activations = vec![ActivationType::ReLU, ActivationType::ReLU, ActivationType::Softmax];
 
-    let mut mlp = MLP::new(layer_sizes, activations, LossFunction::CategoricalCrossEntropy, 0.01, 1, 42);
+    // let mut mlp = MLP::new(layer_sizes, activations, LossFunction::CategoricalCrossEntropy, 0.01, false, 42);
 
-    println!("Accuracy before training:");
-    let training_accuracy = evaluate_model(&mut mlp, &training_images, &training_labels);
-    let testing_accuracy = evaluate_model(&mut mlp, &testing_images, &testing_labels);
+    // println!("Accuracy before training:");
+    // let training_accuracy = evaluate_model(&mut mlp, &training_images, &training_labels);
+    // let testing_accuracy = evaluate_model(&mut mlp, &testing_images, &testing_labels);
 
-    println!("Training set: {:.2}%", training_accuracy * 100.0);
-    println!("Testing set: {:.2}%", testing_accuracy * 100.0);
+    // println!("Training set: {:.2}%", training_accuracy * 100.0);
+    // println!("Testing set: {:.2}%", testing_accuracy * 100.0);
 
-    println!("Training started ...");
+    // println!("Training started ...");
 
-    let epochs = 2 as usize;
-    let train_start = Instant::now();
-    mlp.train(&training_images, &training_labels, epochs);
-    let train_duration = train_start.elapsed();
-    println!("Training for {} epochs completed in {:.2?}", epochs, train_duration);
+    // let epochs = 1 as usize;
+    // let train_start = Instant::now();
+    // mlp.train(&training_images, &training_labels, epochs);
+    // let train_duration = train_start.elapsed();
+    // println!("Training for {} epochs completed in {:.2?}", epochs, train_duration);
 
-    let training_accuracy = evaluate_model(&mut mlp, &training_images, &training_labels);
-    let testing_accuracy = evaluate_model(&mut mlp, &testing_images, &testing_labels);
+    // let training_accuracy = evaluate_model(&mut mlp, &training_images, &training_labels);
+    // let testing_accuracy = evaluate_model(&mut mlp, &testing_images, &testing_labels);
 
-    println!("Accuracy on training set: {:.2}%", training_accuracy * 100.0);
-    println!("Accuracy on testing set: {:.2}%", testing_accuracy * 100.0);
+    // println!("Accuracy on training set: {:.2}%", training_accuracy * 100.0);
+    // println!("Accuracy on testing set: {:.2}%", testing_accuracy * 100.0);
 
-    mlp.save("./models/timing_2_epochs.txt").unwrap();
+    // mlp.save("./models/test4_no_normalization.txt").unwrap();
 
 }

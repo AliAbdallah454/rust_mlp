@@ -4,6 +4,8 @@ use std::ops::{Add, Sub};
 use rand_pcg::Pcg64;
 use rand::distributions::{Distribution, Uniform};
 
+use rayon::prelude::*;
+
 #[derive(Clone, Copy)]
 struct RawPointerWrapper {
     raw: *mut f64,
@@ -256,14 +258,43 @@ impl Tensor {
         Tensor::new(data, self.rows, self.cols)
     }
 
+    pub fn hadamard_par(&self, other: &Tensor) -> Tensor {
+        assert_eq!(self.rows, other.rows, "Tensor hadamard: row mismatch");
+        assert_eq!(self.cols, other.cols, "Tensor hadamard: col mismatch");
+        
+        let data: Vec<f64> = self.data.par_iter()
+            .zip(other.data.par_iter())
+            .map(|(a, b)| a * b)
+            .collect();
+        Tensor::new(data, self.rows, self.cols)
+    }
+
+    // Sequential implementation
     pub fn relu(&self) -> Tensor {
         let data = self.data.iter().map(|&x| if x > 0.0 { x } else { 0.0 }).collect();
         Tensor::new(data, self.rows, self.cols)
     }
 
-    /// ReLU derivative (1 if x > 0, 0 otherwise)
     pub fn relu_derivative(&self) -> Tensor {
         let data = self.data.iter().map(|&x| if x > 0.0 { 1.0 } else { 0.0 }).collect();
+        Tensor::new(data, self.rows, self.cols)
+    }
+
+    // Parallel implementation using rayon
+    pub fn relu_rayon(&self) -> Tensor {
+        assert_eq!(self.cols, 1, "relu only works on column vectors (rx1 tensors)");
+        let data: Vec<f64> = self.data.par_iter()
+            .map(|&x| x.max(0.0))
+            .collect();
+        Tensor::new(data, self.rows, 1)
+    }
+
+    /// ReLU derivative (1 if x > 0, 0 otherwise)
+    pub fn relu_derivative_rayon(&self) -> Tensor {
+        // use rayon::prelude::*;
+        let data: Vec<f64> = self.data.par_iter()
+            .map(|&x| if x > 0.0 { 1.0 } else { 0.0 })
+            .collect();
         Tensor::new(data, self.rows, self.cols)
     }
 

@@ -72,7 +72,7 @@ impl MLP {
         let mut bias_gradients = Vec::new();
         
         for layer in self.layers.iter().rev() {
-            let (dx, dw, db) = layer.backward(&gradient);
+            let (dx, dw, db) = layer.backward(&gradient, self.nb_threads);
             weight_gradients.push(dw);
             bias_gradients.push(db);
             gradient = dx;
