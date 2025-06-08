@@ -19,7 +19,7 @@ pub struct MLP {
 }
 
 impl MLP {
-    pub fn new(layer_sizes: Vec<u32>, activations: Vec<ActivationType>, loss_function: LossFunction, learning_rate: f32, nb_threads: usize, seed: u64) -> Self {
+    pub fn new(layer_sizes: Vec<usize>, activations: Vec<ActivationType>, loss_function: LossFunction, learning_rate: f32, nb_threads: usize, seed: u64) -> Self {
         assert_eq!(layer_sizes.len() - 1, activations.len(), "Number of activations must match number of layers");
         
         let mut layers = Vec::new();
@@ -226,9 +226,9 @@ impl MLP {
                 return Err(std::io::Error::new(std::io::ErrorKind::InvalidData, "Invalid layer dimensions"));
             }
             
-            let rows: u32 = dims[0].parse()
+            let rows: usize = dims[0].parse()
                 .map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidData, "Invalid weight rows"))?;
-            let cols: u32 = dims[1].parse()
+            let cols: usize = dims[1].parse()
                 .map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidData, "Invalid weight cols"))?;
             
             // Read activation type

@@ -16,8 +16,8 @@ unsafe impl Send for RawPointerWrapper {}
 #[derive(Debug, Clone)]
 pub struct Tensor {
     pub data: Vec<f32>,
-    pub rows: u32,
-    pub cols: u32
+    pub rows: usize,
+    pub cols: usize
 }
 
 // Overload the + operator for Tensor + Tensor
@@ -57,7 +57,7 @@ impl Sub for Tensor {
 
 impl Tensor {
 
-    pub fn new(data: Vec<f32>, rows: u32, cols: u32) -> Tensor {
+    pub fn new(data: Vec<f32>, rows: usize, cols: usize) -> Tensor {
         Tensor {
             data: data,
             rows: rows,
@@ -69,7 +69,7 @@ impl Tensor {
         Tensor { data: vec![scalar], rows: 1, cols: 1 }
     }
 
-    pub fn random(rows: u32, cols: u32, seed: u64) -> Self {
+    pub fn random(rows: usize, cols: usize, seed: u64) -> Self {
         use rand::SeedableRng;
         let mut rng = Pcg64::seed_from_u64(seed);
         // can be changed to be from -1.0 to 1.0 later
@@ -91,7 +91,7 @@ impl Tensor {
         }
     }
 
-    pub fn dims(&self) -> (u32, u32) {
+    pub fn dims(&self) -> (usize, usize) {
         (self.rows, self.cols)
     }
 
@@ -151,7 +151,7 @@ impl Tensor {
             handle.join().unwrap();
         }
 
-        Tensor::new(result, r1 as u32, c2 as u32)
+        Tensor::new(result, r1 as usize, c2 as usize)
     }
 
     // #[allow(dead_code)]
@@ -228,7 +228,7 @@ impl Tensor {
     //             .collect();
     //     });
         
-    //     Tensor::new(result, r1 as u32, c2 as u32)
+    //     Tensor::new(result, r1 as usize, c2 as usize)
     // }
 
     pub fn square(&self) -> Tensor {
@@ -354,15 +354,15 @@ impl Tensor {
             }
         }
     
-        Tensor::new(jacobian, len as u32, len as u32) // Jacobian is (r x r)
+        Tensor::new(jacobian, len as usize, len as usize) // Jacobian is (r x r)
     }
 
-    pub fn ones(rows: u32, cols: u32) -> Tensor {
+    pub fn ones(rows: usize, cols: usize) -> Tensor {
         let data = vec![1.0; (rows * cols) as usize];
         Tensor::new(data, rows, cols)
     }
 
-    pub fn zeros(rows: u32, cols: u32) -> Tensor {
+    pub fn zeros(rows: usize, cols: usize) -> Tensor {
         let data = vec![0.0; (rows * cols) as usize];
         Tensor::new(data, rows, cols)
     }
