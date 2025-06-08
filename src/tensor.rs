@@ -1,3 +1,4 @@
+use std::arch::x86_64::{_mm256_add_ps, _mm256_loadu_ps, _mm256_mul_ps, _mm256_setzero_ps, _mm256_storeu_ps};
 use std::{thread, vec};
 use std::ops::{Add, Sub};
 
@@ -101,6 +102,43 @@ impl Tensor {
             let ptr = vec_ptr.raw.add(index);
             *ptr = val;
         }
+    }
+
+    pub fn mul_vec(&self, vector: &Tensor) -> Tensor {
+        assert_eq!(vector.cols, 1, "Expected vector to be rx1 instead of {}x{}", vector.rows, vector.cols);
+        let mut res = vec![0.0 as f32; self.rows as usize];
+
+        for i in 0..self.rows {
+            unsafe {
+                let mut total = 0.0 as f32;
+                let mut elem = _mm256_setzero_ps();
+                
+                let complete_chunks = self.cols / 8;
+                for j in 0..complete_chunks {
+                    let offset = j * 8;
+                    let a_vec = _mm256_loadu_ps(self.data.as_ptr().add(i*self.cols + offset));
+                    let b_vec = _mm256_loadu_ps(vector.data.as_ptr().add(offset));
+                    let prod = _mm256_mul_ps(a_vec, b_vec);                   
+                    elem = _mm256_add_ps(prod, elem);
+                }
+
+                let remaining = self.cols % 8;
+                if remaining > 0 {
+                    let offset = complete_chunks * 8;
+                    for j in 0..remaining {
+                        total += self.data[i*self.cols + offset + j] * vector.data[offset + j];
+                    }
+                }
+
+                let mut values = vec![0.0 as f32; 8];
+                _mm256_storeu_ps(values.as_mut_ptr(), elem);
+                total += values[0] + values[1] + values[2] + values[3] + 
+                        values[4] + values[5] + values[6] + values[7];
+
+                *res.as_mut_ptr().add(i) = total;
+            }
+        }
+        Tensor::new(res, vector.rows, 1)
     }
 
     #[allow(dead_code)]
