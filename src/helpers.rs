@@ -1,4 +1,4 @@
-use crate::Tensor;
+use crate::tensor::Tensor;
 use crate::mlp::MLP;
 
 use rand::seq::SliceRandom;

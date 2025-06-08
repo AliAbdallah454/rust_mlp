@@ -47,7 +47,7 @@ impl MLP {
     pub fn forward(&mut self, input: &Tensor) -> Tensor {
         let mut current_input = input.clone();
         
-        for (i, layer) in &mut self.layers.iter_mut().enumerate() {
+        for (_i, layer) in &mut self.layers.iter_mut().enumerate() {
             current_input = layer.forward(&current_input, self.nb_threads);
         }
         current_input

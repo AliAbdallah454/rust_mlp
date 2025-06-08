@@ -1,10 +1,8 @@
 use std::arch::x86_64::{_mm256_add_ps, _mm256_loadu_ps, _mm256_mul_ps, _mm256_setzero_ps, _mm256_storeu_ps};
 use std::{thread, vec};
 use std::ops::{Add, Sub};
-
 use rand_pcg::Pcg64;
 use rand::distributions::{Distribution, Uniform};
-
 use rayon::prelude::*;
 
 #[derive(Clone, Copy)]
@@ -21,7 +19,6 @@ pub struct Tensor {
     pub cols: usize
 }
 
-// Overload the + operator for Tensor + Tensor
 impl Add for &Tensor {
     type Output = Tensor;
 
@@ -33,7 +30,6 @@ impl Add for &Tensor {
     }
 }
 
-// Overload the - operator for Tensor - Tensor
 impl Sub for &Tensor {
     type Output = Tensor;
 
@@ -94,6 +90,40 @@ impl Tensor {
 
     pub fn dims(&self) -> (usize, usize) {
         (self.rows, self.cols)
+    }
+
+    pub fn ones(rows: usize, cols: usize) -> Tensor {
+        let data = vec![1.0; (rows * cols) as usize];
+        Tensor::new(data, rows, cols)
+    }
+
+    pub fn zeros(rows: usize, cols: usize) -> Tensor {
+        let data = vec![0.0; (rows * cols) as usize];
+        Tensor::new(data, rows, cols)
+    }
+
+    pub fn transpose(&self) -> Tensor {
+        let mut data = vec![0.0; (self.rows * self.cols) as usize];
+        for i in 0..self.rows {
+            for j in 0..self.cols {
+                data[(j * self.rows + i) as usize] = self.data[(i * self.cols + j) as usize];
+            }
+        }
+        Tensor::new(data, self.cols, self.rows)
+    }
+
+    pub fn scale(&self, scalar: f32) -> Tensor {
+        let data = self.data.iter().map(|&x| x * scalar).collect();
+        Tensor::new(data, self.rows, self.cols)
+    }
+
+    pub fn sum(&self) -> f32 {
+        self.data.iter().sum()
+    }
+
+    pub fn square(&self) -> Tensor {
+        let data = self.data.iter().map(|x| x * x).collect();
+        Tensor::new(data, self.rows, self.cols)
     }
 
     #[allow(dead_code)]
@@ -190,88 +220,6 @@ impl Tensor {
         }
 
         Tensor::new(result, r1 as usize, c2 as usize)
-    }
-
-    // #[allow(dead_code)]
-    // #[cfg(target_arch = "x86_64")]
-    // pub fn mul_par_simd(&self, matrix: &Tensor, nb_threads: usize) -> Tensor {
-    //     use std::{arch::x86_64::*, sync::Arc};
-        
-    //     let c1 = self.cols as usize;
-    //     let r1 = self.rows as usize;
-    //     let c2 = matrix.cols as usize;
-    //     let r2 = matrix.rows as usize;
-
-    //     assert_eq!(c1, r2, "Matrix dimensions don't match: {}x{} * {}x{}", r1, c1, r2, c2);
-        
-    //     let mut result = vec![0.0; r1 * c2];
-    //     let a = Arc::new(&self.data);
-    //     let b = Arc::new(&matrix.data);
-        
-    //     let chunk_size = (r1 + nb_threads - 1) / nb_threads;
-        
-    //     thread::scope(|s| {
-    //         let chunks: Vec<_> = result
-    //             .chunks_mut(chunk_size * c2)
-    //             .enumerate()
-    //             .map(|(chunk_idx, chunk)| {
-    //                 let a = Arc::clone(&a);
-    //                 let b = Arc::clone(&b);
-                    
-    //                 s.spawn(move || {
-    //                     let start_row = chunk_idx * chunk_size;
-    //                     let rows_in_chunk = chunk.len() / c2;
-                        
-    //                     for local_i in 0..rows_in_chunk {
-    //                         let i = start_row + local_i;
-    //                         if i >= r1 { break; }
-                            
-    //                         for j in 0..c2 {
-    //                             let mut sum = 0.0;
-                                
-    //                             unsafe {
-    //                                 let mut sum_vec = _mm256_setzero_pd();
-    //                                 let mut k = 0;
-                                    
-    //                                 // Process 4 f32s at a time with AVX2
-    //                                 while k + 4 <= c1 {
-    //                                     let a_vec = _mm256_loadu_pd(a.as_ptr().add(i * c1 + k));
-    //                                     let b_vec = _mm256_set_pd(
-    //                                         b[(k + 3) * c2 + j],
-    //                                         b[(k + 2) * c2 + j], 
-    //                                         b[(k + 1) * c2 + j],
-    //                                         b[k * c2 + j]
-    //                                     );
-    //                                     sum_vec = _mm256_fmadd_pd(a_vec, b_vec, sum_vec);
-    //                                     k += 4;
-    //                                 }
-                                    
-    //                                 // Extract sum from vector
-    //                                 let mut temp = [0.0; 4];
-    //                                 _mm256_storeu_pd(temp.as_mut_ptr(), sum_vec);
-    //                                 sum = temp.iter().sum();
-                                    
-    //                                 // Handle remaining elements
-    //                                 while k < c1 {
-    //                                     sum += a[i * c1 + k] * b[k * c2 + j];
-    //                                     k += 1;
-    //                                 }
-    //                             }
-                                
-    //                             chunk[local_i * c2 + j] = sum;
-    //                         }
-    //                     }
-    //                 })
-    //             })
-    //             .collect();
-    //     });
-        
-    //     Tensor::new(result, r1 as usize, c2 as usize)
-    // }
-
-    pub fn square(&self) -> Tensor {
-        let data = self.data.iter().map(|x| x * x).collect();
-        Tensor::new(data, self.rows, self.cols)
     }
 
     pub fn argmax(&self) -> usize {
@@ -395,34 +343,6 @@ impl Tensor {
         Tensor::new(jacobian, len as usize, len as usize) // Jacobian is (r x r)
     }
 
-    pub fn ones(rows: usize, cols: usize) -> Tensor {
-        let data = vec![1.0; (rows * cols) as usize];
-        Tensor::new(data, rows, cols)
-    }
-
-    pub fn zeros(rows: usize, cols: usize) -> Tensor {
-        let data = vec![0.0; (rows * cols) as usize];
-        Tensor::new(data, rows, cols)
-    }
-
-    pub fn transpose(&self) -> Tensor {
-        let mut data = vec![0.0; (self.rows * self.cols) as usize];
-        for i in 0..self.rows {
-            for j in 0..self.cols {
-                data[(j * self.rows + i) as usize] = self.data[(i * self.cols + j) as usize];
-            }
-        }
-        Tensor::new(data, self.cols, self.rows)
-    }
-
-    pub fn scale(&self, scalar: f32) -> Tensor {
-        let data = self.data.iter().map(|&x| x * scalar).collect();
-        Tensor::new(data, self.rows, self.cols)
-    }
-
-    pub fn sum(&self) -> f32 {
-        self.data.iter().sum()
-    }
 
     pub fn mse_loss(&self, target: &Tensor) -> f32 {
         let diff = self - target;

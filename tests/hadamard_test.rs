@@ -1,4 +1,4 @@
-use cp_proj::Tensor;
+use cp_proj::tensor::Tensor;
 
 #[cfg(test)]
 mod hadamard_tests {

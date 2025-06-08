@@ -1,4 +1,4 @@
-use cp_proj::Tensor;
+use cp_proj::tensor::Tensor;
 use std::f32::EPSILON;
 use std::time::Instant;
 
@@ -17,7 +17,7 @@ fn tensors_equal(a: &Tensor, b: &Tensor, tolerance: f32) -> bool {
 }
 
 // Helper function to create a tensor with known values for testing
-fn create_test_tensor(data: Vec<f32>, rows: u32, cols: u32) -> Tensor {
+fn create_test_tensor(data: Vec<f32>, rows: usize, cols: usize) -> Tensor {
     Tensor::new(data, rows, cols)
 }
 
@@ -38,11 +38,6 @@ fn test_basic_matrix_multiplication() {
     assert!(tensors_equal(&result_par_1, &expected, EPSILON));
     assert!(tensors_equal(&result_par_2, &expected, EPSILON));
     
-    #[cfg(target_arch = "x86_64")]
-    {
-        let result_simd = a.mul_par_simd(&b, 1);
-        assert!(tensors_equal(&result_simd, &expected, EPSILON));
-    }
 }
 
 #[test]
@@ -57,11 +52,6 @@ fn test_identity_matrix_multiplication() {
     assert!(tensors_equal(&result_seq, &a, EPSILON));
     assert!(tensors_equal(&result_par, &a, EPSILON));
     
-    #[cfg(target_arch = "x86_64")]
-    {
-        let result_simd = a.mul_par_simd(&identity, 2);
-        assert!(tensors_equal(&result_simd, &a, EPSILON));
-    }
 }
 
 #[test]
@@ -77,11 +67,6 @@ fn test_zero_matrix_multiplication() {
     assert!(tensors_equal(&result_seq, &expected_zero, EPSILON));
     assert!(tensors_equal(&result_par, &expected_zero, EPSILON));
     
-    #[cfg(target_arch = "x86_64")]
-    {
-        let result_simd = a.mul_par_simd(&zero, 2);
-        assert!(tensors_equal(&result_simd, &expected_zero, EPSILON));
-    }
 }
 
 #[test]
@@ -97,11 +82,6 @@ fn test_single_element_matrices() {
     assert!(tensors_equal(&result_seq, &expected, EPSILON));
     assert!(tensors_equal(&result_par, &expected, EPSILON));
     
-    #[cfg(target_arch = "x86_64")]
-    {
-        let result_simd = a.mul_par_simd(&b, 1);
-        assert!(tensors_equal(&result_simd, &expected, EPSILON));
-    }
 }
 
 #[test]
@@ -127,15 +107,6 @@ fn test_rectangular_matrices() {
     assert!(tensors_equal(&result_par_2, &expected, EPSILON));
     assert!(tensors_equal(&result_par_3, &expected, EPSILON));
     
-    #[cfg(target_arch = "x86_64")]
-    {
-        let result_simd_1 = a.mul_par_simd(&b, 1);
-        let result_simd_2 = a.mul_par_simd(&b, 2);
-        let result_simd_3 = a.mul_par_simd(&b, 3);
-        assert!(tensors_equal(&result_simd_1, &expected, EPSILON));
-        assert!(tensors_equal(&result_simd_2, &expected, EPSILON));
-        assert!(tensors_equal(&result_simd_3, &expected, EPSILON));
-    }
 }
 
 #[test]
@@ -151,11 +122,6 @@ fn test_vector_multiplication() {
     assert!(tensors_equal(&result_seq, &expected, EPSILON));
     assert!(tensors_equal(&result_par, &expected, EPSILON));
     
-    #[cfg(target_arch = "x86_64")]
-    {
-        let result_simd = matrix.mul_par_simd(&vector, 2);
-        assert!(tensors_equal(&result_simd, &expected, EPSILON));
-    }
 }
 
 #[test]
@@ -171,11 +137,6 @@ fn test_row_vector_multiplication() {
     assert!(tensors_equal(&result_seq, &expected, EPSILON));
     assert!(tensors_equal(&result_par, &expected, EPSILON));
     
-    #[cfg(target_arch = "x86_64")]
-    {
-        let result_simd = row_vector.mul_par_simd(&matrix, 1);
-        assert!(tensors_equal(&result_simd, &expected, EPSILON));
-    }
 }
 
 #[test]
@@ -194,15 +155,6 @@ fn test_large_matrices() {
     assert!(tensors_equal(&result_seq, &result_par_4, 1e-10));
     assert!(tensors_equal(&result_seq, &result_par_8, 1e-10));
     
-    #[cfg(target_arch = "x86_64")]
-    {
-        let result_simd_1 = a.mul_par_simd(&b, 1);
-        let result_simd_4 = a.mul_par_simd(&b, 4);
-        let result_simd_8 = a.mul_par_simd(&b, 8);
-        assert!(tensors_equal(&result_seq, &result_simd_1, 1e-10));
-        assert!(tensors_equal(&result_seq, &result_simd_4, 1e-10));
-        assert!(tensors_equal(&result_seq, &result_simd_8, 1e-10));
-    }
 }
 
 #[test]
@@ -218,13 +170,6 @@ fn test_non_square_large_matrices() {
     assert!(tensors_equal(&result_seq, &result_par_2, 1e-10));
     assert!(tensors_equal(&result_seq, &result_par_5, 1e-10));
     
-    #[cfg(target_arch = "x86_64")]
-    {
-        let result_simd_2 = a.mul_par_simd(&b, 2);
-        let result_simd_5 = a.mul_par_simd(&b, 5);
-        assert!(tensors_equal(&result_seq, &result_simd_2, 1e-10));
-        assert!(tensors_equal(&result_seq, &result_simd_5, 1e-10));
-    }
 }
 
 #[test]
@@ -237,11 +182,6 @@ fn test_thread_count_edge_cases() {
     let result_par_10 = a.mul_par(&b, 10); // More threads than rows
     assert!(tensors_equal(&result_par_10, &expected, EPSILON));
     
-    #[cfg(target_arch = "x86_64")]
-    {
-        let result_simd_10 = a.mul_par_simd(&b, 10);
-        assert!(tensors_equal(&result_simd_10, &expected, EPSILON));
-    }
 }
 
 #[test]
@@ -257,11 +197,6 @@ fn test_negative_values() {
     assert!(tensors_equal(&result_seq, &expected, EPSILON));
     assert!(tensors_equal(&result_par, &expected, EPSILON));
     
-    #[cfg(target_arch = "x86_64")]
-    {
-        let result_simd = a.mul_par_simd(&b, 2);
-        assert!(tensors_equal(&result_simd, &expected, EPSILON));
-    }
 }
 
 #[test]
@@ -277,11 +212,6 @@ fn test_fractional_values() {
     assert!(tensors_equal(&result_seq, &expected, EPSILON));
     assert!(tensors_equal(&result_par, &expected, EPSILON));
     
-    #[cfg(target_arch = "x86_64")]
-    {
-        let result_simd = a.mul_par_simd(&b, 2);
-        assert!(tensors_equal(&result_simd, &expected, EPSILON));
-    }
 }
 
 #[test]
@@ -298,30 +228,6 @@ fn test_incompatible_dimensions_par() {
     let a = create_test_tensor(vec![1.0, 2.0, 3.0, 4.0], 2, 2);
     let b = create_test_tensor(vec![1.0, 2.0, 3.0], 3, 1);
     a.mul_par(&b, 2); // Should panic: 2x2 * 3x1 is invalid
-}
-
-#[test]
-#[cfg(target_arch = "x86_64")]
-#[should_panic(expected = "Matrix dimensions don't match")]
-fn test_incompatible_dimensions_simd() {
-    let a = create_test_tensor(vec![1.0, 2.0, 3.0, 4.0], 2, 2);
-    let b = create_test_tensor(vec![1.0, 2.0, 3.0], 3, 1);
-    a.mul_par_simd(&b, 2); // Should panic: 2x2 * 3x1 is invalid
-}
-
-#[test]
-fn test_simd_alignment_edge_cases() {
-    #[cfg(target_arch = "x86_64")]
-    {
-        // Test matrices where dimensions are not multiples of 4 (SIMD width)
-        let a = create_test_tensor(vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0], 2, 5);
-        let b = create_test_tensor(vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0], 5, 3);
-        
-        let result_seq = a.mul_seq(&b);
-        let result_simd = a.mul_par_simd(&b, 2);
-        
-        assert!(tensors_equal(&result_seq, &result_simd, 1e-10));
-    }
 }
 
 #[test]
@@ -344,15 +250,7 @@ fn test_consistency_across_implementations() {
         
         assert!(tensors_equal(&result_seq, &result_par_1, 1e-12));
         assert!(tensors_equal(&result_seq, &result_par_2, 1e-12));
-        
-        #[cfg(target_arch = "x86_64")]
-        {
-            let result_simd_1 = a.mul_par_simd(&b, 1);
-            let result_simd_2 = a.mul_par_simd(&b, 2);
-            assert!(tensors_equal(&result_seq, &result_simd_1, 1e-12));
-            assert!(tensors_equal(&result_seq, &result_simd_2, 1e-12));
-        }
-    }
+    }        
 }
 
 #[test]
@@ -370,19 +268,7 @@ fn test_performance_comparison() {
     let _result_par = a.mul_par(&b, 4);
     let par_time = start.elapsed();
     
-    #[cfg(target_arch = "x86_64")]
-    {
-        let start = Instant::now();
-        let _result_simd = a.mul_par_simd(&b, 4);
-        let simd_time = start.elapsed();
-        
-        println!("Sequential: {:?}, Parallel: {:?}, SIMD: {:?}", seq_time, par_time, simd_time);
-    }
-    
-    #[cfg(not(target_arch = "x86_64"))]
-    {
-        println!("Sequential: {:?}, Parallel: {:?}", seq_time, par_time);
-    }
+    println!("Sequential: {:?}, Parallel: {:?}", seq_time, par_time);
     
     // This test just ensures the functions complete without panicking
     // In a real scenario, parallel versions should be faster for large matrices
