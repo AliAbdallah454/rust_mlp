@@ -5,7 +5,7 @@ use flate2::read::GzDecoder;
 
 #[derive(Debug)]
 pub struct MnistData {
-    pub images: Vec<Vec<f64>>,
+    pub images: Vec<Vec<f32>>,
     pub labels: Vec<u8>,
 }
 
@@ -24,7 +24,7 @@ impl MnistData {
         Ok(MnistData { images, labels })
     }
     
-    pub fn load_images(path: &str) -> Result<Vec<Vec<f64>>, Box<dyn std::error::Error>> {
+    pub fn load_images(path: &str) -> Result<Vec<Vec<f32>>, Box<dyn std::error::Error>> {
         let file = File::open(path)
             .map_err(|e| format!("Failed to open image file '{}': {}", path, e))?;
         
@@ -69,9 +69,9 @@ impl MnistData {
             reader.read_exact(&mut image_data)
                 .map_err(|e| format!("Failed to read image {}: {}", i, e))?;
             
-            // Convert to f64 and normalize to [0, 1]
-            let image: Vec<f64> = image_data.iter()
-                .map(|&pixel| pixel as f64 / 255.0)
+            // Convert to f32 and normalize to [0, 1]
+            let image: Vec<f32> = image_data.iter()
+                .map(|&pixel| pixel as f32 / 255.0)
                 .collect();
             
             images.push(image);

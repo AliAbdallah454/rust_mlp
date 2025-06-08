@@ -22,7 +22,7 @@ impl Layer {
     pub fn new(input_size: u32, output_size: u32, activation: ActivationType, seed: u64) -> Self {
 
         // Xavier Initialization
-        let scale = (2.0 / input_size as f64).sqrt();
+        let scale = (2.0 / input_size as f32).sqrt();
         let mut weights = Tensor::random(output_size, input_size, seed);
         weights = weights.scale(scale);
         
@@ -100,7 +100,7 @@ impl Layer {
         (dx, dw, db)
     }
 
-    pub fn update_weights(&mut self, dw: &Tensor, db: &Tensor, learning_rate: f64) {
+    pub fn update_weights(&mut self, dw: &Tensor, db: &Tensor, learning_rate: f32) {
 
         // Update weights: W = W - lr * dW
         let weight_update = dw.scale(learning_rate);

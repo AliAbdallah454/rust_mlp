@@ -14,12 +14,12 @@ pub enum LossFunction {
 pub struct MLP {
     pub layers: Vec<Layer>,
     pub nb_threads: usize,
-    pub learning_rate: f64,
+    pub learning_rate: f32,
     pub loss_function: LossFunction 
 }
 
 impl MLP {
-    pub fn new(layer_sizes: Vec<u32>, activations: Vec<ActivationType>, loss_function: LossFunction, learning_rate: f64, nb_threads: usize, seed: u64) -> Self {
+    pub fn new(layer_sizes: Vec<u32>, activations: Vec<ActivationType>, loss_function: LossFunction, learning_rate: f32, nb_threads: usize, seed: u64) -> Self {
         assert_eq!(layer_sizes.len() - 1, activations.len(), "Number of activations must match number of layers");
         
         let mut layers = Vec::new();
@@ -53,7 +53,7 @@ impl MLP {
         current_input
     }
 
-    pub fn backward(&mut self, prediction: &Tensor, target: &Tensor) -> f64 {
+    pub fn backward(&mut self, prediction: &Tensor, target: &Tensor) -> f32 {
         
         // Compute loss
         let (loss, mut gradient) = match self.loss_function {
@@ -90,12 +90,12 @@ impl MLP {
         loss
     }
 
-    pub fn train_step(&mut self, input: &Tensor, target: &Tensor) -> f64 {
+    pub fn train_step(&mut self, input: &Tensor, target: &Tensor) -> f32 {
         let prediction = self.forward(input);
         self.backward(&prediction, target)
     }
 
-    pub fn train(&mut self, inputs: &[Tensor], targets: &[Tensor], epochs: usize) -> Vec<f64> {
+    pub fn train(&mut self, inputs: &[Tensor], targets: &[Tensor], epochs: usize) -> Vec<f32> {
         assert_eq!(inputs.len(), targets.len(), "Number of inputs must match number of targets");
         
         let mut losses = Vec::new();
@@ -108,7 +108,7 @@ impl MLP {
                 epoch_loss += loss;
             }
             
-            epoch_loss /= inputs.len() as f64;
+            epoch_loss /= inputs.len() as f32;
             losses.push(epoch_loss);
             
             println!("Epoch {}: Loss = {:.6}", epoch, epoch_loss);
@@ -132,7 +132,7 @@ impl MLP {
         writeln!(writer, "MLP_SAVE_FORMAT_V1")?;
         writeln!(writer, "{}", self.layers.len())?;
         writeln!(writer, "{}", self.nb_threads)?;
-        writeln!(writer, "{:.17}", self.learning_rate)?; // High precision for f64
+        writeln!(writer, "{:.17}", self.learning_rate)?; // High precision for f32
         
         // Write loss function
         match self.loss_function {
@@ -201,7 +201,7 @@ impl MLP {
             .parse()
             .map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidData, "Invalid thread count"))?;
         
-        let learning_rate: f64 = lines.next()
+        let learning_rate: f32 = lines.next()
             .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::InvalidData, "Missing learning rate"))?
             .parse()
             .map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidData, "Invalid learning rate"))?;
@@ -245,7 +245,7 @@ impl MLP {
             // Read weights
             let mut weights_data = Vec::new();
             for _ in 0..(rows * cols) {
-                let weight: f64 = lines.next()
+                let weight: f32 = lines.next()
                     .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::InvalidData, "Missing weight data"))?
                     .parse()
                     .map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidData, "Invalid weight value"))?;
@@ -256,7 +256,7 @@ impl MLP {
             // Read biases
             let mut biases_data = Vec::new();
             for _ in 0..rows {
-                let bias: f64 = lines.next()
+                let bias: f32 = lines.next()
                     .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::InvalidData, "Missing bias data"))?
                     .parse()
                     .map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidData, "Invalid bias value"))?;

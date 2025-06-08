@@ -1,9 +1,9 @@
 use cp_proj::Tensor;
-use std::f64::EPSILON;
+use std::f32::EPSILON;
 use std::time::Instant;
 
 // Helper function to compare tensors with floating point tolerance
-fn tensors_equal(a: &Tensor, b: &Tensor, tolerance: f64) -> bool {
+fn tensors_equal(a: &Tensor, b: &Tensor, tolerance: f32) -> bool {
     if a.rows != b.rows || a.cols != b.cols {
         return false;
     }
@@ -17,7 +17,7 @@ fn tensors_equal(a: &Tensor, b: &Tensor, tolerance: f64) -> bool {
 }
 
 // Helper function to create a tensor with known values for testing
-fn create_test_tensor(data: Vec<f64>, rows: u32, cols: u32) -> Tensor {
+fn create_test_tensor(data: Vec<f32>, rows: u32, cols: u32) -> Tensor {
     Tensor::new(data, rows, cols)
 }
 

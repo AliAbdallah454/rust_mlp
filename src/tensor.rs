@@ -8,14 +8,14 @@ use rayon::prelude::*;
 
 #[derive(Clone, Copy)]
 struct RawPointerWrapper {
-    raw: *mut f64,
+    raw: *mut f32,
 }
 
 unsafe impl Send for RawPointerWrapper {}
 
 #[derive(Debug, Clone)]
 pub struct Tensor {
-    pub data: Vec<f64>,
+    pub data: Vec<f32>,
     pub rows: u32,
     pub cols: u32
 }
@@ -57,7 +57,7 @@ impl Sub for Tensor {
 
 impl Tensor {
 
-    pub fn new(data: Vec<f64>, rows: u32, cols: u32) -> Tensor {
+    pub fn new(data: Vec<f32>, rows: u32, cols: u32) -> Tensor {
         Tensor {
             data: data,
             rows: rows,
@@ -65,7 +65,7 @@ impl Tensor {
         }
     }
 
-    pub fn scalar(scalar: f64) -> Tensor {
+    pub fn scalar(scalar: f32) -> Tensor {
         Tensor { data: vec![scalar], rows: 1, cols: 1 }
     }
 
@@ -76,7 +76,7 @@ impl Tensor {
         let uniform = Uniform::new(0.0, 1.0);
         let data = (0..rows * cols)
             .map(|_| uniform.sample(&mut rng))
-            .collect::<Vec<f64>>();
+            .collect::<Vec<f32>>();
 
         Tensor::new(data, rows, cols)
     }
@@ -96,7 +96,7 @@ impl Tensor {
     }
 
     #[allow(dead_code)]
-    fn modify_vector_chunk(index: usize, val: f64, vec_ptr: RawPointerWrapper) {
+    fn modify_vector_chunk(index: usize, val: f32, vec_ptr: RawPointerWrapper) {
         unsafe {
             let ptr = vec_ptr.raw.add(index);
             *ptr = val;
@@ -154,82 +154,82 @@ impl Tensor {
         Tensor::new(result, r1 as u32, c2 as u32)
     }
 
-    #[allow(dead_code)]
-    #[cfg(target_arch = "x86_64")]
-    pub fn mul_par_simd(&self, matrix: &Tensor, nb_threads: usize) -> Tensor {
-        use std::{arch::x86_64::*, sync::Arc};
+    // #[allow(dead_code)]
+    // #[cfg(target_arch = "x86_64")]
+    // pub fn mul_par_simd(&self, matrix: &Tensor, nb_threads: usize) -> Tensor {
+    //     use std::{arch::x86_64::*, sync::Arc};
         
-        let c1 = self.cols as usize;
-        let r1 = self.rows as usize;
-        let c2 = matrix.cols as usize;
-        let r2 = matrix.rows as usize;
+    //     let c1 = self.cols as usize;
+    //     let r1 = self.rows as usize;
+    //     let c2 = matrix.cols as usize;
+    //     let r2 = matrix.rows as usize;
 
-        assert_eq!(c1, r2, "Matrix dimensions don't match: {}x{} * {}x{}", r1, c1, r2, c2);
+    //     assert_eq!(c1, r2, "Matrix dimensions don't match: {}x{} * {}x{}", r1, c1, r2, c2);
         
-        let mut result = vec![0.0; r1 * c2];
-        let a = Arc::new(&self.data);
-        let b = Arc::new(&matrix.data);
+    //     let mut result = vec![0.0; r1 * c2];
+    //     let a = Arc::new(&self.data);
+    //     let b = Arc::new(&matrix.data);
         
-        let chunk_size = (r1 + nb_threads - 1) / nb_threads;
+    //     let chunk_size = (r1 + nb_threads - 1) / nb_threads;
         
-        thread::scope(|s| {
-            let chunks: Vec<_> = result
-                .chunks_mut(chunk_size * c2)
-                .enumerate()
-                .map(|(chunk_idx, chunk)| {
-                    let a = Arc::clone(&a);
-                    let b = Arc::clone(&b);
+    //     thread::scope(|s| {
+    //         let chunks: Vec<_> = result
+    //             .chunks_mut(chunk_size * c2)
+    //             .enumerate()
+    //             .map(|(chunk_idx, chunk)| {
+    //                 let a = Arc::clone(&a);
+    //                 let b = Arc::clone(&b);
                     
-                    s.spawn(move || {
-                        let start_row = chunk_idx * chunk_size;
-                        let rows_in_chunk = chunk.len() / c2;
+    //                 s.spawn(move || {
+    //                     let start_row = chunk_idx * chunk_size;
+    //                     let rows_in_chunk = chunk.len() / c2;
                         
-                        for local_i in 0..rows_in_chunk {
-                            let i = start_row + local_i;
-                            if i >= r1 { break; }
+    //                     for local_i in 0..rows_in_chunk {
+    //                         let i = start_row + local_i;
+    //                         if i >= r1 { break; }
                             
-                            for j in 0..c2 {
-                                let mut sum = 0.0;
+    //                         for j in 0..c2 {
+    //                             let mut sum = 0.0;
                                 
-                                unsafe {
-                                    let mut sum_vec = _mm256_setzero_pd();
-                                    let mut k = 0;
+    //                             unsafe {
+    //                                 let mut sum_vec = _mm256_setzero_pd();
+    //                                 let mut k = 0;
                                     
-                                    // Process 4 f64s at a time with AVX2
-                                    while k + 4 <= c1 {
-                                        let a_vec = _mm256_loadu_pd(a.as_ptr().add(i * c1 + k));
-                                        let b_vec = _mm256_set_pd(
-                                            b[(k + 3) * c2 + j],
-                                            b[(k + 2) * c2 + j], 
-                                            b[(k + 1) * c2 + j],
-                                            b[k * c2 + j]
-                                        );
-                                        sum_vec = _mm256_fmadd_pd(a_vec, b_vec, sum_vec);
-                                        k += 4;
-                                    }
+    //                                 // Process 4 f32s at a time with AVX2
+    //                                 while k + 4 <= c1 {
+    //                                     let a_vec = _mm256_loadu_pd(a.as_ptr().add(i * c1 + k));
+    //                                     let b_vec = _mm256_set_pd(
+    //                                         b[(k + 3) * c2 + j],
+    //                                         b[(k + 2) * c2 + j], 
+    //                                         b[(k + 1) * c2 + j],
+    //                                         b[k * c2 + j]
+    //                                     );
+    //                                     sum_vec = _mm256_fmadd_pd(a_vec, b_vec, sum_vec);
+    //                                     k += 4;
+    //                                 }
                                     
-                                    // Extract sum from vector
-                                    let mut temp = [0.0; 4];
-                                    _mm256_storeu_pd(temp.as_mut_ptr(), sum_vec);
-                                    sum = temp.iter().sum();
+    //                                 // Extract sum from vector
+    //                                 let mut temp = [0.0; 4];
+    //                                 _mm256_storeu_pd(temp.as_mut_ptr(), sum_vec);
+    //                                 sum = temp.iter().sum();
                                     
-                                    // Handle remaining elements
-                                    while k < c1 {
-                                        sum += a[i * c1 + k] * b[k * c2 + j];
-                                        k += 1;
-                                    }
-                                }
+    //                                 // Handle remaining elements
+    //                                 while k < c1 {
+    //                                     sum += a[i * c1 + k] * b[k * c2 + j];
+    //                                     k += 1;
+    //                                 }
+    //                             }
                                 
-                                chunk[local_i * c2 + j] = sum;
-                            }
-                        }
-                    })
-                })
-                .collect();
-        });
+    //                             chunk[local_i * c2 + j] = sum;
+    //                         }
+    //                     }
+    //                 })
+    //             })
+    //             .collect();
+    //     });
         
-        Tensor::new(result, r1 as u32, c2 as u32)
-    }
+    //     Tensor::new(result, r1 as u32, c2 as u32)
+    // }
 
     pub fn square(&self) -> Tensor {
         let data = self.data.iter().map(|x| x * x).collect();
@@ -262,7 +262,7 @@ impl Tensor {
         assert_eq!(self.rows, other.rows, "Tensor hadamard: row mismatch");
         assert_eq!(self.cols, other.cols, "Tensor hadamard: col mismatch");
         
-        let data: Vec<f64> = self.data.par_iter()
+        let data: Vec<f32> = self.data.par_iter()
             .zip(other.data.par_iter())
             .map(|(a, b)| a * b)
             .collect();
@@ -283,7 +283,7 @@ impl Tensor {
     // Parallel implementation using rayon
     pub fn relu_rayon(&self) -> Tensor {
         assert_eq!(self.cols, 1, "relu only works on column vectors (rx1 tensors)");
-        let data: Vec<f64> = self.data.par_iter()
+        let data: Vec<f32> = self.data.par_iter()
             .map(|&x| x.max(0.0))
             .collect();
         Tensor::new(data, self.rows, 1)
@@ -292,7 +292,7 @@ impl Tensor {
     /// ReLU derivative (1 if x > 0, 0 otherwise)
     pub fn relu_derivative_rayon(&self) -> Tensor {
         // use rayon::prelude::*;
-        let data: Vec<f64> = self.data.par_iter()
+        let data: Vec<f32> = self.data.par_iter()
             .map(|&x| if x > 0.0 { 1.0 } else { 0.0 })
             .collect();
         Tensor::new(data, self.rows, self.cols)
@@ -327,9 +327,9 @@ impl Tensor {
     pub fn softmax(&self) -> Tensor {
         assert_eq!(self.cols, 1, "Softmax only implemented for column vectors (r x 1)");
 
-        let exp_vals: Vec<f64> = self.data.iter().map(|&x| x.exp()).collect();
-        let sum: f64 = exp_vals.iter().sum();
-        let data: Vec<f64> = exp_vals.iter().map(|&x| x / sum).collect();
+        let exp_vals: Vec<f32> = self.data.iter().map(|&x| x.exp()).collect();
+        let sum: f32 = exp_vals.iter().sum();
+        let data: Vec<f32> = exp_vals.iter().map(|&x| x / sum).collect();
         Tensor::new(data, self.rows, self.cols)
     }
 
@@ -377,28 +377,28 @@ impl Tensor {
         Tensor::new(data, self.cols, self.rows)
     }
 
-    pub fn scale(&self, scalar: f64) -> Tensor {
+    pub fn scale(&self, scalar: f32) -> Tensor {
         let data = self.data.iter().map(|&x| x * scalar).collect();
         Tensor::new(data, self.rows, self.cols)
     }
 
-    pub fn sum(&self) -> f64 {
+    pub fn sum(&self) -> f32 {
         self.data.iter().sum()
     }
 
-    pub fn mse_loss(&self, target: &Tensor) -> f64 {
+    pub fn mse_loss(&self, target: &Tensor) -> f32 {
         let diff = self - target;
         let squared = diff.square();
-        squared.sum() / (self.rows * self.cols) as f64
+        squared.sum() / (self.rows * self.cols) as f32
     }
 
     pub fn mse_loss_derivative(&self, target: &Tensor) -> Tensor {
         let diff = self - target;
-        diff.scale(2.0 / (self.rows * self.cols) as f64)
+        diff.scale(2.0 / (self.rows * self.cols) as f32)
     }
 
     // sum of -y*log(y_hat)
-    pub fn categorical_cross_entropy(&self, targets: &Tensor) -> f64 {
+    pub fn categorical_cross_entropy(&self, targets: &Tensor) -> f32 {
         assert_eq!(self.rows, targets.rows, "Batch size mismatch");
         assert_eq!(self.cols, targets.cols, "Class count mismatch");
     
@@ -411,7 +411,7 @@ impl Tensor {
             total_loss -= y_true * y_pred.ln();
         }
     
-        total_loss / self.rows as f64 // Can be changed ...
+        total_loss / self.rows as f32 // Can be changed ...
     }
     
     // softmax - y
@@ -422,7 +422,7 @@ impl Tensor {
 
         // self: softmax output, targets: one-hot labels
         let diff = self - targets;
-        diff.scale(1.0 / self.rows as f64) // Can be changed ...
+        diff.scale(1.0 / self.rows as f32) // Can be changed ...
     }
 
 }

@@ -5,7 +5,7 @@ mod hadamard_tests {
     use super::*;
 
     // Helper function to compare tensors with floating point tolerance
-    fn tensors_equal(a: &Tensor, b: &Tensor, tolerance: f64) -> bool {
+    fn tensors_equal(a: &Tensor, b: &Tensor, tolerance: f32) -> bool {
         if a.rows != b.rows || a.cols != b.cols {
             return false;
         }
@@ -109,8 +109,8 @@ mod hadamard_tests {
     fn test_hadamard_large_matrix() {
         // Test with larger matrix (8x8 = 64 elements) to test threading
         let size = 8;
-        let a_data: Vec<f64> = (1..=size*size).map(|x| x as f64).collect();
-        let b_data: Vec<f64> = (1..=size*size).map(|x| (x * 2) as f64).collect();
+        let a_data: Vec<f32> = (1..=size*size).map(|x| x as f32).collect();
+        let b_data: Vec<f32> = (1..=size*size).map(|x| (x * 2) as f32).collect();
         
         let a = Tensor::new(a_data.clone(), size, size);
         let b = Tensor::new(b_data.clone(), size, size);
@@ -118,7 +118,7 @@ mod hadamard_tests {
         let result = a.hadamard(&b);
         
         // Expected: each element should be a[i] * b[i] = i * (i * 2) = 2 * i^2
-        let expected_data: Vec<f64> = (1..=size*size).map(|x| (x * x * 2) as f64).collect();
+        let expected_data: Vec<f32> = (1..=size*size).map(|x| (x * x * 2) as f32).collect();
         let expected = Tensor::new(expected_data, size, size);
         
         assert!(tensors_equal(&result, &expected, 1e-10));
@@ -133,8 +133,8 @@ mod hadamard_tests {
         let cols = 50;
         let total_elements = rows * cols;
         
-        let a_data: Vec<f64> = (0..total_elements).map(|x| (x as f64) + 1.0).collect();
-        let b_data: Vec<f64> = (0..total_elements).map(|x| (x as f64) * 2.0 + 1.0).collect();
+        let a_data: Vec<f32> = (0..total_elements).map(|x| (x as f32) + 1.0).collect();
+        let b_data: Vec<f32> = (0..total_elements).map(|x| (x as f32) * 2.0 + 1.0).collect();
         
         let a = Tensor::new(a_data.clone(), rows, cols);
         let b = Tensor::new(b_data.clone(), rows, cols);
@@ -216,8 +216,8 @@ mod hadamard_tests {
         let cols = 15;
         let total = rows * cols;
         
-        let a_data: Vec<f64> = (0..total).map(|x| (x as f64) * 0.7 + 1.5).collect();
-        let b_data: Vec<f64> = (0..total).map(|x| (x as f64) * 1.3 - 0.5).collect();
+        let a_data: Vec<f32> = (0..total).map(|x| (x as f32) * 0.7 + 1.5).collect();
+        let b_data: Vec<f32> = (0..total).map(|x| (x as f32) * 1.3 - 0.5).collect();
         
         let a = Tensor::new(a_data.clone(), rows, cols);
         let b = Tensor::new(b_data.clone(), rows, cols);
