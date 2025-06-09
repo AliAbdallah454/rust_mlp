@@ -38,6 +38,7 @@ fn main() {
 
     let layer_sizes = vec![28*28, 512, 512, 10];
     let activations = vec![ActivationType::ReLU, ActivationType::ReLU, ActivationType::Softmax];
+    
     println!("\nTesting different thread counts (1, 4, 8) ...");
     
     let thread_counts = vec![1, 4, 8];

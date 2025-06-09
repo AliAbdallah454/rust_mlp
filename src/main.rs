@@ -39,18 +39,28 @@ fn main() {
     let vec1 = Tensor::random(28*28, 1, 24);
 
     let start = Instant::now();
-    let res1 = mat1.mul_vec(&vec1);
+    let _res1 = mat1.mul_vec(&vec1);
     let simd_duration = start.elapsed();
-    println!("SIMD duration: {:?}", simd_duration);
+    println!("SIMD duration:                {:?}", simd_duration);
 
     let start = Instant::now();
-    let res2 = mat1.mul_par(&vec1, 8);
-    let mul_par_duration = start.elapsed();
-    println!("mul_par duration: {:?}", mul_par_duration);
+    let _res2 = mat1.mul_vec_parallel(&vec1, 1);
+    let mul_vec_parallel_duration = start.elapsed();
+    println!("mul_vec_parallel duration:    {:?}", mul_vec_parallel_duration);
 
-    let speedup = mul_par_duration.as_secs_f64() / simd_duration.as_secs_f64();
-    println!("Speedup factor: {:.2}x", speedup);
-    println!("res1 len: {}", res1.data.len());
-    println!("res2 len: {}", res2.data.len());
+    let start = Instant::now();
+    let _res3 = mat1.mul_par(&vec1, 1);
+    let mul_par_duration = start.elapsed();
+    println!("mul_par duration:            {:?}", mul_par_duration);
+
+    let start = Instant::now();
+    let _res4 = mat1.mul_par(&vec1, 1);
+    let mul_seq_duration = start.elapsed();
+    println!("mul_seq duration:            {:?}", mul_seq_duration);
+
+    println!("\nSpeedup Analysis:");
+    println!("mul_vec_parallel vs mul_seq: {:.2}x", mul_seq_duration.as_secs_f64() / mul_vec_parallel_duration.as_secs_f64());
+    println!("mul_vec_parallel vs mul_par: {:.2}x", mul_par_duration.as_secs_f64() / mul_vec_parallel_duration.as_secs_f64());
+    println!("mul_vec_parallel vs mul_vec: {:.2}x", simd_duration.as_secs_f64() / mul_vec_parallel_duration.as_secs_f64());
 
 }

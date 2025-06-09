@@ -1,9 +1,12 @@
 use std::arch::x86_64::{_mm256_add_ps, _mm256_loadu_ps, _mm256_mul_ps, _mm256_setzero_ps, _mm256_storeu_ps};
+use std::sync::Arc;
 use std::{thread, vec};
 use std::ops::{Add, Sub};
 use rand_pcg::Pcg64;
 use rand::distributions::{Distribution, Uniform};
 use rayon::prelude::*;
+
+use crate::tensor;
 
 #[derive(Clone, Copy)]
 struct RawPointerWrapper {
@@ -11,6 +14,9 @@ struct RawPointerWrapper {
 }
 
 unsafe impl Send for RawPointerWrapper {}
+
+unsafe impl Sync for RawPointerWrapper {}
+
 
 #[derive(Debug, Clone)]
 pub struct Tensor {
@@ -169,6 +175,74 @@ impl Tensor {
             }
         }
         Tensor::new(res, vector.rows, 1)
+    }
+
+    pub fn mul_vec_parallel(&self, vector: &Tensor, nb_threads: usize) -> Tensor {
+
+        let mut res = vec![0.0 as f32; self.rows];
+        let raw_ptr = RawPointerWrapper {raw: res.as_mut_ptr()};
+
+        let rows_per_thread = self.rows / nb_threads;
+
+        let self_data: Arc<Vec<f32>> = Arc::from(self.data.clone());
+        let vec_data: Arc<Vec<f32>> = Arc::from(vector.data.clone());
+
+        let mut handles = vec![];
+
+        for i in 0..nb_threads {
+            
+            let start = i * rows_per_thread;
+            let mut end = start + rows_per_thread;
+            if i == nb_threads {
+                end = self.rows;
+            }
+
+            let self_data = Arc::clone(&self_data);
+            let vec_data = Arc::clone(&vec_data);
+            let raw_ptr = raw_ptr;
+            let cols = self.cols;
+
+            let handle = thread::spawn(move || {
+
+                for k in start..end {
+                    unsafe {
+                        let mut total = 0.0 as f32;
+                        let mut elem = _mm256_setzero_ps();
+                        
+                        let complete_chunks = cols / 8;
+                        for j in 0..complete_chunks {
+                            let offset = j * 8;
+                            let a_vec = _mm256_loadu_ps(self_data.as_ptr().add(k * cols + offset));
+                            let b_vec = _mm256_loadu_ps(vec_data.as_ptr().add(offset));
+                            let prod = _mm256_mul_ps(a_vec, b_vec);                   
+                            elem = _mm256_add_ps(prod, elem);
+                        }
+
+                        let remaining = cols % 8;
+                        if remaining > 0 {
+                            let offset = complete_chunks * 8;
+                            for j in 0..remaining {
+                                total += self_data[k * cols + offset + j] * vec_data[offset + j];
+                            }
+                        }
+        
+                        let mut values = vec![0.0 as f32; 8];
+                        _mm256_storeu_ps(values.as_mut_ptr(), elem);
+                        total += values[0] + values[1] + values[2] + values[3] + 
+                                values[4] + values[5] + values[6] + values[7];
+        
+                        Tensor::modify_vector_chunk(k, total, raw_ptr);
+                    }
+                }
+
+            });
+            handles.push(handle);
+        }
+
+        for handle in handles {
+            handle.join().unwrap();
+        }
+        Tensor::new(res, self.rows, 1)
     }
 
     #[allow(dead_code)]
