@@ -1,4 +1,4 @@
-use crate::tensor::Tensor;
+use crate::tensor::{ExecutionMode, Tensor};
 
 #[derive(Clone, Debug)]
 pub enum ActivationType {
@@ -38,12 +38,12 @@ impl Layer {
         }
     }
 
-    pub fn forward(&mut self, input: &Tensor, nb_threads: usize) -> Tensor {
+    pub fn forward(&mut self, input: &Tensor, execution_mode: ExecutionMode) -> Tensor {
 
         self.last_input = Some(input.clone());
         
         // Compute z = W * x + b
-        let z = self.weights.mul_par(input, nb_threads);
+        let z = self.weights.mul(input, execution_mode);
         let z_with_bias = &z + &self.biases;
         
         self.last_pre_activation = Some(z_with_bias.clone());
@@ -61,7 +61,7 @@ impl Layer {
         output
     }
 
-    pub fn backward(&self, gradient: &Tensor, nb_threads: usize) -> (Tensor, Tensor, Tensor) {
+    pub fn backward(&self, gradient: &Tensor, execution_mode: ExecutionMode) -> (Tensor, Tensor, Tensor) {
 
         let input = self.last_input.as_ref().expect("Forward pass must be called before backward");
         let pre_activation = self.last_pre_activation.as_ref().expect("Forward pass must be called before backward");
@@ -79,7 +79,7 @@ impl Layer {
         // dL/dz = dL/da * da/dz (we have dL/da and da/dz)
         let dz = match self.activation {
             ActivationType::Softmax => {
-                activation_derivative.mul_par(gradient, nb_threads)
+                activation_derivative.mul(gradient, execution_mode)
             },
             _ => {
                 gradient.hadamard(&activation_derivative)
@@ -88,14 +88,14 @@ impl Layer {
 
         // Gradient w.r.t. weights: dL/dW = dL/dz * x^T
         let input_t = input.transpose();
-        let dw = dz.mul_par(&input_t, nb_threads);
+        let dw = dz.mul(&input_t, execution_mode);
         
         // Gradient w.r.t. biases: dL/db = dL/dz
         let db = dz.clone();
         
         // Gradient w.r.t. input: dL/dx = W^T * dL/dz
         let weights_t = self.weights.transpose();
-        let dx = weights_t.mul_par(&dz, nb_threads);
+        let dx = weights_t.mul(&dz, execution_mode);
         
         (dx, dw, db)
     }

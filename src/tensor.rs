@@ -482,9 +482,9 @@ impl Tensor {
     pub fn mul(&self, matrix: &Tensor, execution_mode: ExecutionMode) -> Tensor {
         match execution_mode {
             ExecutionMode::Sequential => self.mul_seq(matrix),
-            ExecutionMode::Parallel => self.mul_par(matrix, 4),
+            ExecutionMode::Parallel => self.mul_par(matrix, 6),
             ExecutionMode::SIMD => self.mul_simd(matrix),
-            ExecutionMode::ParallelSIMD => self.mul_simd_parallel(matrix, 4)
+            ExecutionMode::ParallelSIMD => self.mul_simd_parallel(matrix, 6)
         }
     }
 

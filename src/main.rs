@@ -20,8 +20,8 @@ fn count_diff(a: &Tensor, b: &Tensor, epsilon: f32) {
 
 fn main() {
 
-    let mat1 = Tensor::random(512, 28*28, 42);
-    let mat2 = Tensor::random(28*28, 64, 24);
+    let mat1 = Tensor::random(64, 28*28, 42);
+    let mat2 = Tensor::random(28*28, 16, 24);
 
     let start = Instant::now();
     let r1 = mat1.mul(&mat2, ExecutionMode::ParallelSIMD);
@@ -34,7 +34,6 @@ fn main() {
     println!("mul_vec_parallel duration: {:?}", mul_seq_duration);
 
     println!("Equal: {}", r1 == r2);
-
     println!("mul_ vs mul_seq: {:.2}x", mul_seq_duration.as_secs_f64() / simd_duration.as_secs_f64());
 
     println!("Dims r1: {}x{}", r1.rows, r1.cols);

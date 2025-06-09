@@ -2,7 +2,7 @@ use cp_proj::helpers::split_dataset;
 use cp_proj::layer::ActivationType;
 use cp_proj::mlp::{LossFunction, MLP};
 use cp_proj::mnits_data::MnistData;
-use cp_proj::tensor::Tensor;
+use cp_proj::tensor::{ExecutionMode, Tensor};
 use std::time::Instant;
 
 fn main() {
@@ -26,8 +26,8 @@ fn main() {
         labels.push(Tensor::new(one_hot, 10, 1));
     }
 
-    images.truncate(100);
-    labels.truncate(100);
+    images.truncate(1);
+    labels.truncate(1);
 
     let (
         training_images, 
@@ -36,15 +36,21 @@ fn main() {
         _testing_labels
     ) = split_dataset(images, labels, 0.8);
 
-    let layer_sizes = vec![28*28, 512, 512, 10];
+    let layer_sizes = vec![28*28, 1024*8, 1024*8, 10];
     let activations = vec![ActivationType::ReLU, ActivationType::ReLU, ActivationType::Softmax];
+        
+    let execution_modes = vec![
+        ExecutionMode::Sequential, 
+        ExecutionMode::Parallel, 
+        ExecutionMode::SIMD, 
+        ExecutionMode::ParallelSIMD
+    ];
     
-    println!("\nTesting different thread counts (1, 4, 8) ...");
-    
-    let thread_counts = vec![1, 4, 8];
-    let mut mlps: Vec<MLP> = thread_counts.iter().map(|&threads| {
+    println!("\nTesting different thread counts ExecutionModes ...");
+
+    let mut mlps: Vec<MLP> = execution_modes.iter().map(|&execution_mode| {
         MLP::new(layer_sizes.clone(), activations.clone(), 
-            LossFunction::CategoricalCrossEntropy, 0.01, threads, 42)
+            LossFunction::CategoricalCrossEntropy, 0.01, execution_mode, 42)
     }).collect();
 
     let mut durations = Vec::new();
@@ -55,7 +61,7 @@ fn main() {
         let duration = train_start.elapsed();
         durations.push(duration);
         
-        println!("{} threads training time: {:.2?}", thread_counts[i], duration);
+        println!("{:?} threads training time: {:.2?}", execution_modes[i], duration);
     }
 
     // Calculate and print speedups relative to single thread
@@ -63,7 +69,7 @@ fn main() {
     println!("\nSpeedups relative to single thread:");
     for (i, duration) in durations.iter().enumerate() {
         let speedup = single_thread_time / duration.as_secs_f64();
-        println!("{} threads: {:.2}x", thread_counts[i], speedup);
+        println!("{:?} threads: {:.2}x", execution_modes[i], speedup);
     }
 
 }
