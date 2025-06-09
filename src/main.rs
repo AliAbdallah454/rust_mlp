@@ -1,66 +1,44 @@
 use cp_proj::tensor::Tensor;
-use std::arch::x86_64::{_mm256_loadu_ps, _mm256_mul_ps, _mm256_storeu_ps};
 use std::time::Instant;
 
-fn _side_by_size(a: &Tensor, b: &Tensor) {
+fn count_diff(a: &Tensor, b: &Tensor, epsilon: f32) {
     assert_eq!(a.data.len(), b.data.len(), "Tensor data lengths must match");
 
+    let mut max = 0 as f32;
+    let mut count = 0;
+
     for i in 0..a.data.len() {
-        println!("{} - {}: {}", a.data[i], b.data[i], a.data[i] == b.data[i]);
-    }
-
-}
-
-unsafe fn _element_wise_mul(a: &Vec<f32>, b: &Vec<f32>, c: *mut f32) {
-
-    let len = a.len();
-
-    let chunks = len / 8;
-    for i in 0..chunks {
-        let idx = i * 8;
-        unsafe {
-            let a_vec = _mm256_loadu_ps(a.as_ptr().add(idx));
-            let b_vec = _mm256_loadu_ps(b.as_ptr().add(idx));
-            let mul = _mm256_mul_ps(a_vec, b_vec);
-            
-            _mm256_storeu_ps(c.add(idx), mul);
+        if (a.data[i] - b.data[i]).abs() > epsilon {
+            count += 1;
+            max = max.max((a.data[i] - b.data[i]).abs());
         }
     }
 
-    let remaining_start = chunks * 8;
-    for i in remaining_start..len {
-        *c.add(i) = a[i] * b[i]
-    }
-    
+    println!("max: {}, count: {}", max, count);
+
 }
+
 fn main() {
 
-    let mat1 = Tensor::random(16, 28*28, 42);
-    let vec1 = Tensor::random(28*28, 1, 24);
+    let mat1 = Tensor::random(1024, 28*28, 42);
+    let mat2 = Tensor::random(28*28, 2, 24);
 
     let start = Instant::now();
-    let _res1 = mat1.mul_vec(&vec1);
+    let r1 = mat1.mul_simd_parallel(&mat2, 6);
     let simd_duration = start.elapsed();
-    println!("SIMD duration:                {:?}", simd_duration);
+    println!("parallel SIMD duration: {:?}", simd_duration);
 
     let start = Instant::now();
-    let _res2 = mat1.mul_vec_parallel(&vec1, 1);
-    let mul_vec_parallel_duration = start.elapsed();
-    println!("mul_vec_parallel duration:    {:?}", mul_vec_parallel_duration);
-
-    let start = Instant::now();
-    let _res3 = mat1.mul_par(&vec1, 1);
-    let mul_par_duration = start.elapsed();
-    println!("mul_par duration:            {:?}", mul_par_duration);
-
-    let start = Instant::now();
-    let _res4 = mat1.mul_par(&vec1, 1);
+    let r2 = mat1.mul_seq(&mat2);
     let mul_seq_duration = start.elapsed();
-    println!("mul_seq duration:            {:?}", mul_seq_duration);
+    println!("mul_vec_parallel duration: {:?}", mul_seq_duration);
 
-    println!("\nSpeedup Analysis:");
-    println!("mul_vec_parallel vs mul_seq: {:.2}x", mul_seq_duration.as_secs_f64() / mul_vec_parallel_duration.as_secs_f64());
-    println!("mul_vec_parallel vs mul_par: {:.2}x", mul_par_duration.as_secs_f64() / mul_vec_parallel_duration.as_secs_f64());
-    println!("mul_vec_parallel vs mul_vec: {:.2}x", simd_duration.as_secs_f64() / mul_vec_parallel_duration.as_secs_f64());
+    println!("Equal: {}", r1 == r2);
+
+    println!("mul_ vs mul_seq: {:.2}x", mul_seq_duration.as_secs_f64() / simd_duration.as_secs_f64());
+
+    println!("Dims r1: {}x{}", r1.rows, r1.cols);
+    println!("Dims r1: {}x{}", r2.rows, r2.cols);
+    count_diff(&r1, &r2, 0.0001);
 
 }

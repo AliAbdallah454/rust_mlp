@@ -58,6 +58,19 @@ impl Sub for Tensor {
     }
 }
 
+impl PartialEq for Tensor {
+    fn eq(&self, other: &Self) -> bool {
+        let epsilon = 1e-2;
+        if self.rows != other.rows || self.cols != other.cols {
+            return false;
+        }
+
+        self.data.iter()
+            .zip(&other.data)
+            .all(|(a, b)| (a - b).abs() < epsilon)
+    }
+}
+
 impl Tensor {
 
     pub fn new(data: Vec<f32>, rows: usize, cols: usize) -> Tensor {
@@ -174,7 +187,7 @@ impl Tensor {
                 *res.as_mut_ptr().add(i) = total;
             }
         }
-        Tensor::new(res, vector.rows, 1)
+        Tensor::new(res, self.rows, 1)
     }
 
     pub fn mul_vec_parallel(&self, vector: &Tensor, nb_threads: usize) -> Tensor {
@@ -193,7 +206,7 @@ impl Tensor {
             
             let start = i * rows_per_thread;
             let mut end = start + rows_per_thread;
-            if i == nb_threads {
+            if i == nb_threads - 1 {
                 end = self.rows;
             }
 
@@ -245,9 +258,172 @@ impl Tensor {
         Tensor::new(res, self.rows, 1)
     }
 
+    pub fn mul_simd(&self, tensor: &Tensor) -> Tensor {
+        assert_eq!(self.cols, tensor.rows, "Expected tensor dimensions to match: {}x{} * {}x{}", self.rows, self.cols, tensor.rows, tensor.cols);
+        let mut res = vec![0.0 as f32; (self.rows * tensor.cols) as usize];
+    
+        let transposed = if tensor.cols != 1 {
+            &tensor.transpose()
+        } else {
+            tensor
+        };
+
+        for i in 0..self.rows {
+            for k in 0..tensor.cols {
+                unsafe {
+                    let mut total = 0.0 as f32;
+                    let mut elem = _mm256_setzero_ps();
+                    
+                    let complete_chunks = self.cols / 8;
+                    for j in 0..complete_chunks {
+                        let offset = j * 8;
+
+                        let a_vec = _mm256_loadu_ps(self.data.as_ptr().add(i * self.cols + offset));
+                        let b_vec = _mm256_loadu_ps(transposed.data.as_ptr().add(k * transposed.cols + offset));
+
+                        let prod = _mm256_mul_ps(a_vec, b_vec);                   
+                        elem = _mm256_add_ps(prod, elem);
+                    }
+    
+                    let remaining = self.cols % 8;
+                    if remaining > 0 {
+                        let offset = complete_chunks * 8;
+                        for j in 0..remaining {
+                            total += self.data[i * self.cols + offset + j] * transposed.data[k * transposed.cols + offset + j];
+                        }
+                    }
+    
+                    let mut values = [0.0f32; 8];
+                    _mm256_storeu_ps(values.as_mut_ptr(), elem);
+                    total += values[0] + values[1] + values[2] + values[3] + 
+                            values[4] + values[5] + values[6] + values[7];
+    
+                    *res.as_mut_ptr().add(i * tensor.cols + k) = total;
+                }
+            }
+        }
+        Tensor::new(res, self.rows, tensor.cols)
+    }
+
+    pub fn mul_simd_parallel(&self, tensor: &Tensor, nb_threads: usize) -> Tensor {
+
+        let mut flag = true;
+
+        let tensor = if tensor.cols != 1 {
+            flag = false;
+            &tensor.transpose()
+        } else {
+            &tensor.clone()
+        };
+
+        let c1 = self.cols;
+        let r1 = self.rows;
+
+        let mut r2 = 0;
+        let mut c2 = 0;
+
+        if flag {
+            r2 = tensor.rows;
+            c2 = tensor.cols;
+        } else {
+            r2 = tensor.cols;
+            c2 = tensor.rows;
+        }
+
+        let mut res = vec![0.0 as f32; r1 * c2];
+        let raw_ptr = RawPointerWrapper {raw: res.as_mut_ptr()};
+
+        let rows_per_thread = r1 / nb_threads;
+        
+        let self_data: Arc<Vec<f32>> = Arc::from(self.data.clone());
+        let tensor_data: Arc<Vec<f32>> = Arc::from(tensor.data.clone());
+
+        let mut handles = vec![];
+
+        for i in 0..nb_threads {
+            
+            let start = i * rows_per_thread;
+            let mut end = start + rows_per_thread;
+            if i == nb_threads - 1 {
+                end = self.rows;
+            }
+
+            let self_data = Arc::clone(&self_data);
+            let vec_data = Arc::clone(&tensor_data);
+            let raw_ptr = raw_ptr;
+
+            let handle = thread::spawn(move || {
+
+                for i in start..end {
+                    for k in 0..c2 {
+                        unsafe {
+                            let mut total = 0.0 as f32;
+                            let mut elem = _mm256_setzero_ps();
+                            
+                            let complete_chunks = c1 / 8;
+                            for j in 0..complete_chunks {
+                                let offset = j * 8;
+        
+                                let a_vec = _mm256_loadu_ps(self_data.as_ptr().add(i * c1 + offset));
+                                let b_vec = _mm256_loadu_ps(vec_data.as_ptr().add(k * r2 + offset));
+                                // let b_vec = _mm256_loadu_ps(vec_data.as_ptr().add(k * c2 + offset));
+        
+                                let prod = _mm256_mul_ps(a_vec, b_vec);                   
+                                elem = _mm256_add_ps(prod, elem);
+                            }
+            
+                            let remaining = c1 % 8;
+                            if remaining > 0 {
+                                let offset = complete_chunks * 8;
+                                for j in 0..remaining {
+                                    // total += self_data[i * c1 + offset + j] * vec_data[k * c2 + offset + j];
+                                    total += self_data[i * c1 + offset + j] * vec_data[k * r2 + offset + j];
+                                }
+                            }
+            
+                            let mut values = [0.0f32; 8];
+                            _mm256_storeu_ps(values.as_mut_ptr(), elem);
+                            total += values[0] + values[1] + values[2] + values[3] + 
+                                    values[4] + values[5] + values[6] + values[7];
+            
+                            Tensor::modify_vector_chunk(i * c2 + k, total, raw_ptr);
+                        }
+                    }
+                }
+
+            });
+            handles.push(handle);
+        }
+
+        for handle in handles {
+            handle.join().unwrap();
+        }
+        Tensor::new(res, r1, c2)
+
+    }
+
     #[allow(dead_code)]
     pub fn mul_seq(&self, matrix: &Tensor) -> Tensor {
-        self.mul_par(matrix, 1)
+
+        let c1 = self.cols;
+        let r1 = self.rows;
+        let c2 = matrix.cols;
+        let r2 = matrix.rows;
+
+        assert_eq!(c1, r2, "Matrix dimensions don't match: {}x{} * {}x{}", r1, c1, r2, c2);
+
+        let mut result = vec![0.0; r1 * c2];
+
+        for i in 0..r1 {
+            for j in 0..c2 {
+                let mut sum = 0.0;
+                for k in 0..c1 {
+                    sum += self.data[i * c1 + k] * matrix.data[k * c2 + j];
+                }
+                result[i * c2 + j] = sum;
+            }
+        }
+        Tensor::new(result, r1, c2)
     }
 
     #[allow(dead_code)]
@@ -293,7 +469,7 @@ impl Tensor {
             handle.join().unwrap();
         }
 
-        Tensor::new(result, r1 as usize, c2 as usize)
+        Tensor::new(result, r1, c2)
     }
 
     pub fn argmax(&self) -> usize {
@@ -318,17 +494,6 @@ impl Tensor {
         Tensor::new(data, self.rows, self.cols)
     }
 
-    pub fn hadamard_par(&self, other: &Tensor) -> Tensor {
-        assert_eq!(self.rows, other.rows, "Tensor hadamard: row mismatch");
-        assert_eq!(self.cols, other.cols, "Tensor hadamard: col mismatch");
-        
-        let data: Vec<f32> = self.data.par_iter()
-            .zip(other.data.par_iter())
-            .map(|(a, b)| a * b)
-            .collect();
-        Tensor::new(data, self.rows, self.cols)
-    }
-
     // Sequential implementation
     pub fn relu(&self) -> Tensor {
         let data = self.data.iter().map(|&x| if x > 0.0 { x } else { 0.0 }).collect();
@@ -337,24 +502,6 @@ impl Tensor {
 
     pub fn relu_derivative(&self) -> Tensor {
         let data = self.data.iter().map(|&x| if x > 0.0 { 1.0 } else { 0.0 }).collect();
-        Tensor::new(data, self.rows, self.cols)
-    }
-
-    // Parallel implementation using rayon
-    pub fn relu_rayon(&self) -> Tensor {
-        assert_eq!(self.cols, 1, "relu only works on column vectors (rx1 tensors)");
-        let data: Vec<f32> = self.data.par_iter()
-            .map(|&x| x.max(0.0))
-            .collect();
-        Tensor::new(data, self.rows, 1)
-    }
-
-    /// ReLU derivative (1 if x > 0, 0 otherwise)
-    pub fn relu_derivative_rayon(&self) -> Tensor {
-        // use rayon::prelude::*;
-        let data: Vec<f32> = self.data.par_iter()
-            .map(|&x| if x > 0.0 { 1.0 } else { 0.0 })
-            .collect();
         Tensor::new(data, self.rows, self.cols)
     }
 
@@ -416,7 +563,6 @@ impl Tensor {
     
         Tensor::new(jacobian, len as usize, len as usize) // Jacobian is (r x r)
     }
-
 
     pub fn mse_loss(&self, target: &Tensor) -> f32 {
         let diff = self - target;
