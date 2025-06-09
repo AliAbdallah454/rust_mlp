@@ -17,6 +17,13 @@ unsafe impl Send for RawPointerWrapper {}
 
 unsafe impl Sync for RawPointerWrapper {}
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ExecutionMode {
+    Sequential,
+    Parallel,
+    SIMD,
+    ParallelSIMD,
+}
 
 #[derive(Debug, Clone)]
 pub struct Tensor {
@@ -470,6 +477,15 @@ impl Tensor {
         }
 
         Tensor::new(result, r1, c2)
+    }
+
+    pub fn mul(&self, matrix: &Tensor, execution_mode: ExecutionMode) -> Tensor {
+        match execution_mode {
+            ExecutionMode::Sequential => self.mul_seq(matrix),
+            ExecutionMode::Parallel => self.mul_par(matrix, 4),
+            ExecutionMode::SIMD => self.mul_simd(matrix),
+            ExecutionMode::ParallelSIMD => self.mul_simd_parallel(matrix, 4)
+        }
     }
 
     pub fn argmax(&self) -> usize {

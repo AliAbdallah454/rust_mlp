@@ -1,4 +1,4 @@
-use cp_proj::tensor::Tensor;
+use cp_proj::tensor::{ExecutionMode, Tensor};
 use std::time::Instant;
 
 fn count_diff(a: &Tensor, b: &Tensor, epsilon: f32) {
@@ -20,16 +20,16 @@ fn count_diff(a: &Tensor, b: &Tensor, epsilon: f32) {
 
 fn main() {
 
-    let mat1 = Tensor::random(1024, 28*28, 42);
-    let mat2 = Tensor::random(28*28, 2, 24);
+    let mat1 = Tensor::random(512, 28*28, 42);
+    let mat2 = Tensor::random(28*28, 64, 24);
 
     let start = Instant::now();
-    let r1 = mat1.mul_simd_parallel(&mat2, 6);
+    let r1 = mat1.mul(&mat2, ExecutionMode::ParallelSIMD);
     let simd_duration = start.elapsed();
     println!("parallel SIMD duration: {:?}", simd_duration);
 
     let start = Instant::now();
-    let r2 = mat1.mul_seq(&mat2);
+    let r2 = mat1.mul(&mat2, ExecutionMode::Sequential);
     let mul_seq_duration = start.elapsed();
     println!("mul_vec_parallel duration: {:?}", mul_seq_duration);
 
