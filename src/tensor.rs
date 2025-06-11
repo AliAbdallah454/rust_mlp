@@ -4,9 +4,6 @@ use std::{thread, vec};
 use std::ops::{Add, Sub};
 use rand_pcg::Pcg64;
 use rand::distributions::{Distribution, Uniform};
-use rayon::prelude::*;
-
-use crate::tensor;
 
 #[derive(Clone, Copy)]
 struct RawPointerWrapper {

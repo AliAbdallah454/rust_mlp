@@ -9,6 +9,7 @@ pub enum ActivationType {
     Softmax
 }
 
+#[derive(Clone)]
 pub struct Layer {
     pub weights: Tensor,
     pub biases: Tensor,

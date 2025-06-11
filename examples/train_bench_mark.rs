@@ -36,7 +36,7 @@ fn main() {
         _testing_labels
     ) = split_dataset(images, labels, 0.8);
 
-    let layer_sizes = vec![28*28, 1024*8, 1024*8, 10];
+    let layer_sizes = vec![28*28, 1048*8, 1048*8, 10];
     let activations = vec![ActivationType::ReLU, ActivationType::ReLU, ActivationType::Softmax];
         
     let execution_modes = vec![
@@ -61,7 +61,7 @@ fn main() {
         let duration = train_start.elapsed();
         durations.push(duration);
         
-        println!("{:?} threads training time: {:.2?}", execution_modes[i], duration);
+        println!("{:?} mode training time: {:.2?}", execution_modes[i], duration);
     }
 
     // Calculate and print speedups relative to single thread
@@ -69,7 +69,7 @@ fn main() {
     println!("\nSpeedups relative to single thread:");
     for (i, duration) in durations.iter().enumerate() {
         let speedup = single_thread_time / duration.as_secs_f64();
-        println!("{:?} threads: {:.2}x", execution_modes[i], speedup);
+        println!("{:?} mode: {:.2}x", execution_modes[i], speedup);
     }
 
 }

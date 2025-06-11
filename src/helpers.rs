@@ -18,6 +18,7 @@ pub fn evaluate_model(mlp: &mut MLP, images: &[Tensor], labels: &[Tensor]) -> f6
     let accuracy = correct as f64 / images.len() as f64;
     accuracy
 }
+
 pub fn split_dataset(
     images: Vec<Tensor>,
     labels: Vec<Tensor>,
