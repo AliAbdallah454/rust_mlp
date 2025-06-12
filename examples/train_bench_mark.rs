@@ -46,7 +46,7 @@ fn main() {
         ExecutionMode::ParallelSIMD
     ];
     
-    println!("\nTesting different thread counts ExecutionModes ...");
+    println!("\nTesting different Execution Modes ...");
 
     let mut mlps: Vec<MLP> = execution_modes.iter().map(|&execution_mode| {
         MLP::new(layer_sizes.clone(), activations.clone(), 
@@ -64,9 +64,8 @@ fn main() {
         println!("{:?} mode training time: {:.2?}", execution_modes[i], duration);
     }
 
-    // Calculate and print speedups relative to single thread
     let single_thread_time = durations[0].as_secs_f64();
-    println!("\nSpeedups relative to single thread:");
+    println!("\nSpeedups relative to Sequential Exectution:");
     for (i, duration) in durations.iter().enumerate() {
         let speedup = single_thread_time / duration.as_secs_f64();
         println!("{:?} mode: {:.2}x", execution_modes[i], speedup);

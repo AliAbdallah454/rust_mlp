@@ -21,7 +21,7 @@ fn count_diff(a: &Tensor, b: &Tensor, epsilon: f32) {
 fn main() {
 
     let mat1 = Tensor::random(512, 28*28, 42);
-    let mat2 = Tensor::random(28*28, 16, 24);
+    let mat2 = Tensor::random(28*28, 32, 24);
 
     let start = Instant::now();
     let r1 = mat1.mul(&mat2, ExecutionMode::ParallelSIMD);

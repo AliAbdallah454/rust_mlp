@@ -1,34 +1,35 @@
-use cp_proj::tensor::Tensor;
+use cp_proj::tensor::{ExecutionMode, Tensor};
 
 fn main() {
 
-    let size = 1_000;
+    let size = 500;
 
     let mat1 = Tensor::random(size, size, 42);
     let mat2 = Tensor::random(size, size, 24);
 
-    // Run sequential version first
     let start_seq = std::time::Instant::now();
     let _res_seq = mat1.mul_seq(&mat2);
     let duration_seq = start_seq.elapsed();
     println!("Sequential multiplication took: {:.3?}", duration_seq);
 
-    // Test different thread counts
-    let thread_counts = vec![4, 8, 12];
+    let modes = vec![
+        ExecutionMode::Parallel,
+        ExecutionMode::SIMD,
+        ExecutionMode::ParallelSIMD
+    ];
     let mut durations = Vec::new();
 
-    for &threads in &thread_counts {
+    for &mode in &modes {
         let start_par = std::time::Instant::now();
-        let _res_par = mat1.mul_par(&mat2, threads);
+        let _res_par = mat1.mul(&mat2, mode);
         let duration_par = start_par.elapsed();
         durations.push(duration_par);
-        println!("Parallel multiplication ({} threads) took: {:.3?}", threads, duration_par);
+        println!("{:?} took: {:.3?}", mode, duration_par);
     }
 
-    // Calculate and print speedups
     println!("\nSpeedups relative to sequential:");
     for (i, duration) in durations.iter().enumerate() {
         let speedup = duration_seq.as_secs_f64() / duration.as_secs_f64();
-        println!("{} threads: {:.2}x", thread_counts[i], speedup);
+        println!("{:?} threads: {:.2}x", modes[i], speedup);
     }
 }
