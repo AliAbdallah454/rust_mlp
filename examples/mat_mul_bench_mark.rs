@@ -8,7 +8,7 @@ fn main() {
     let mat2 = Tensor::random(size, size, 24);
 
     let start_seq = std::time::Instant::now();
-    let _res_seq = mat1.mul_seq(&mat2);
+    let _res_seq = mat1.mul(&mat2, ExecutionMode::Sequential);
     let duration_seq = start_seq.elapsed();
     println!("Sequential multiplication took: {:.3?}", duration_seq);
 
