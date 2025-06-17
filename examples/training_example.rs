@@ -1,4 +1,4 @@
-use cp_proj::helpers::split_dataset;
+use cp_proj::helpers::{evaluate_model, split_dataset};
 use cp_proj::layer::ActivationType;
 use cp_proj::mlp::{LossFunction, MLP};
 use cp_proj::mnits_data::MnistData;
@@ -32,8 +32,8 @@ fn main() {
     let (
         training_images, 
         training_labels, 
-        _testing_images, 
-        _testing_labels
+        testing_images, 
+        testing_labels
     ) = split_dataset(images, labels, 0.8);
 
     let layer_sizes = vec![28*28, 16, 16, 10];
@@ -44,5 +44,10 @@ fn main() {
     let mut mlp = MLP::new(layer_sizes, activations, LossFunction::CategoricalCrossEntropy, 0.05, ExecutionMode::ParallelSIMD, 42);
 
     mlp.train(&training_images, &training_labels, 10);
+
+    let accuracy = evaluate_model(&mut mlp, &testing_images, &testing_labels);
+    println!("Accuracy is: {}", accuracy);
+
+    mlp.save("./models/api2-test1.txt").unwrap();
 
 }
