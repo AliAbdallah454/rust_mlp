@@ -121,7 +121,6 @@ impl MLP {
         self.forward(input)
     }
 }
-
 impl MLP {
     /// Save the entire MLP (weights, biases, architecture, hyperparameters) to a file
     pub fn save<P: AsRef<Path>>(&self, path: P) -> std::io::Result<()> {
@@ -134,8 +133,10 @@ impl MLP {
         
         // Write execution mode
         match self.execution_mode {
-            ExecutionMode::SingleThread => writeln!(writer, "SingleThread")?,
-            ExecutionMode::MultiThread(threads) => writeln!(writer, "MultiThread {}", threads)?,
+            ExecutionMode::Sequential => writeln!(writer, "Sequential")?,
+            ExecutionMode::Parallel => writeln!(writer, "Parallel")?,
+            ExecutionMode::SIMD => writeln!(writer, "SIMD")?,
+            ExecutionMode::ParallelSIMD => writeln!(writer, "ParallelSIMD")?,
         }
         
         writeln!(writer, "{:.17}", self.learning_rate)?; // High precision for f32
@@ -206,16 +207,12 @@ impl MLP {
         let execution_mode_line = lines.next()
             .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::InvalidData, "Missing execution mode"))?;
         
-        let execution_mode = if execution_mode_line == "SingleThread" {
-            ExecutionMode::SingleThread
-        } else if execution_mode_line.starts_with("MultiThread ") {
-            let threads_str = execution_mode_line.strip_prefix("MultiThread ")
-                .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::InvalidData, "Invalid execution mode format"))?;
-            let threads: usize = threads_str.parse()
-                .map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidData, "Invalid thread count"))?;
-            ExecutionMode::MultiThread(threads)
-        } else {
-            return Err(std::io::Error::new(std::io::ErrorKind::InvalidData, "Invalid execution mode"));
+        let execution_mode = match execution_mode_line {
+            "Sequential" => ExecutionMode::Sequential,
+            "Parallel" => ExecutionMode::Parallel,
+            "SIMD" => ExecutionMode::SIMD,
+            "ParallelSIMD" => ExecutionMode::ParallelSIMD,
+            _ => return Err(std::io::Error::new(std::io::ErrorKind::InvalidData, "Invalid execution mode")),
         };
         
         let learning_rate: f32 = lines.next()
