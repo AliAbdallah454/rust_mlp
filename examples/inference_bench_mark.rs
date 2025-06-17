@@ -4,6 +4,8 @@ use cp_proj::mlp::{LossFunction, MLP};
 use cp_proj::mnits_data::MnistData;
 use cp_proj::tensor::{ExecutionMode, Tensor};
 use std::time::Instant;
+use alloc::vec::Vec;
+
 
 fn main() {
     let train_data_result = MnistData::load_from_files(
