@@ -95,6 +95,7 @@ impl eframe::App for MnistApp {
 
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.heading("MNIST Digit Recognition with Neural Network");
+            ui.label("Architecture: 784 → 16 → 16 → 10 (Compact Model)");
             
             ui.separator();
             
@@ -341,7 +342,8 @@ impl MnistApp {
             let (training_images, training_labels, testing_images, testing_labels) = 
                 split_dataset(images, labels, 0.8);
             
-            let layer_sizes = vec![28 * 28, 128, 64, 10];
+            // Changed architecture: 784 -> 16 -> 16 -> 10
+            let layer_sizes = vec![28 * 28, 16, 16, 10];
             let activations = vec![
                 ActivationType::ReLU, 
                 ActivationType::ReLU, 
@@ -431,8 +433,8 @@ impl MnistApp {
                 let (training_images, training_labels, testing_images, testing_labels) = 
                     split_dataset(images, labels, 0.8);
                 
-                // Create the MLP
-                let layer_sizes = vec![28 * 28, 128, 64, 10];
+                // Changed architecture: 784 -> 16 -> 16 -> 10
+                let layer_sizes = vec![28 * 28, 16, 16, 10];
                 let activations = vec![
                     ActivationType::ReLU, 
                     ActivationType::ReLU, 
