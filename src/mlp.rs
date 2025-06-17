@@ -5,7 +5,7 @@ use std::fs::File;
 use std::io::{Write, Read, BufWriter, BufReader};
 use std::path::Path;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum LossFunction {
     MSE,
     CategoricalCrossEntropy

@@ -1,6 +1,6 @@
 use crate::tensor::{ExecutionMode, Tensor};
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug,PartialEq)]
 pub enum ActivationType {
     ReLU,
     Sigmoid,
