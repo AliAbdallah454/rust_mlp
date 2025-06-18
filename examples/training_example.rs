@@ -26,8 +26,8 @@ fn main() {
         labels.push(Tensor::new(one_hot, 10, 1));
     }
 
-    images.truncate(15_000);
-    labels.truncate(15_000);
+    // images.truncate(15_000);
+    // labels.truncate(15_000);
 
     let (
         training_images, 
@@ -36,18 +36,16 @@ fn main() {
         testing_labels
     ) = split_dataset(images, labels, 0.8);
 
-    let layer_sizes = vec![28*28, 16, 16, 10];
+    let layer_sizes = vec![28*28, 24, 24, 10];
     let activations = vec![ActivationType::ReLU, ActivationType::ReLU, ActivationType::Softmax];
         
-    println!("\nTesting different Execution Modes ...");
-
     let mut mlp = MLP::new(layer_sizes, activations, LossFunction::CategoricalCrossEntropy, 0.05, ExecutionMode::ParallelSIMD, 42);
 
-    mlp.train(&training_images, &training_labels, 10);
+    mlp.train(&training_images, &training_labels, 20);
 
     let accuracy = evaluate_model(&mut mlp, &testing_images, &testing_labels);
     println!("Accuracy is: {}", accuracy);
 
-    mlp.save("./models/api2-test1.txt").unwrap();
+    mlp.save("./models/api2-test2.txt").unwrap();
 
 }
