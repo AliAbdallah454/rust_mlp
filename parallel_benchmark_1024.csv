@@ -1,0 +1,8 @@
+Mode,Threads,Time(s),Speedup_vs_Sequential
+Sequential,1,60.080325,1.0
+Parallel,1,60.937051,0.9859
+Parallel,2,31.416290,1.9124
+Parallel,3,24.351786,2.4672
+Parallel,4,20.375563,2.9486
+Parallel,5,17.587701,3.4160
+Parallel,6,17.208255,3.4914

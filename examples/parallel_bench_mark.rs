@@ -4,13 +4,13 @@ use std::time::Instant;
 use cp_proj::tensor::{Tensor, ExecutionMode};
 
 fn main() {
-    let size = 256;
+    let size = 32;
     let seed = 123;
 
     let a = Tensor::random(size, size, seed);
     let b = Tensor::random(size, size, seed + 1);
 
-    let mut file = File::create("parallel_benchmark_256.csv").expect("Unable to create file");
+    let mut file = File::create("parallel_benchmark_32.csv").expect("Unable to create file");
     writeln!(file, "Mode,Threads,Time(s),Speedup_vs_Sequential").unwrap();
 
     // Baseline: Sequential
@@ -35,5 +35,5 @@ fn main() {
         ).unwrap();
     }
 
-    println!("Benchmark results written to parallel_benchmark_256.csv");
+    println!("Benchmark results written to parallel_benchmark_32.csv");
 }
