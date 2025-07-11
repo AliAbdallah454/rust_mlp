@@ -17,9 +17,9 @@ unsafe impl Sync for RawPointerWrapper {}
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ExecutionMode {
     Sequential,
-    Parallel,
+    Parallel(usize),      // number of threads
     SIMD,
-    ParallelSIMD,
+    ParallelSIMD(usize),  // number of threads
 }
 
 #[derive(Debug, Clone)]
@@ -479,9 +479,9 @@ impl Tensor {
     pub fn mul(&self, matrix: &Tensor, execution_mode: ExecutionMode) -> Tensor {
         match execution_mode {
             ExecutionMode::Sequential => self.mul_seq(matrix),
-            ExecutionMode::Parallel => self.mul_par(matrix, 6),
+            ExecutionMode::Parallel(threads) => self.mul_par(matrix, threads),
             ExecutionMode::SIMD => self.mul_simd(matrix),
-            ExecutionMode::ParallelSIMD => self.mul_simd_parallel(matrix, 6)
+            ExecutionMode::ParallelSIMD(threads) => self.mul_simd_parallel(matrix, threads)
         }
     }
 

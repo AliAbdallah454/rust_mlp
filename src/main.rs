@@ -1,43 +1,51 @@
-use cp_proj::tensor::{ExecutionMode, Tensor};
 use std::time::Instant;
+use std::fs::File;
+use std::io::Write;
 
-fn count_diff(a: &Tensor, b: &Tensor, epsilon: f32) {
-    assert_eq!(a.data.len(), b.data.len(), "Tensor data lengths must match");
-
-    let mut max = 0 as f32;
-    let mut count = 0;
-
-    for i in 0..a.data.len() {
-        if (a.data[i] - b.data[i]).abs() > epsilon {
-            count += 1;
-            max = max.max((a.data[i] - b.data[i]).abs());
-        }
-    }
-
-    println!("max: {}, count: {}", max, count);
-
-}
+use cp_proj::tensor::ExecutionMode;
+use cp_proj::tensor::Tensor;
 
 fn main() {
+    let sizes = vec![32, 64, 128, 256, 512, 1024, 2048, 4096];
+    let seed = 42u64;
 
-    let mat1 = Tensor::random(512, 28*28, 42);
-    let mat2 = Tensor::random(28*28, 32, 24);
+    println!("{:<8} | {:<12} | {:<12} | {:<12} | {:<12}", "Size", "Sequential", "Parallel", "SIMD", "ParSIMD");
+    println!("{}", "-".repeat(66));
 
-    let start = Instant::now();
-    let r1 = mat1.mul(&mat2, ExecutionMode::ParallelSIMD);
-    let simd_duration = start.elapsed();
-    println!("parallel SIMD duration: {:?}", simd_duration);
+    let mut file = File::create("tensor_benchmark.csv").expect("Failed to create CSV file");
+    writeln!(file, "Size,Sequential,Parallel Speedup,SIMD Speedup,ParallelSIMD Speedup").unwrap();
 
-    let start = Instant::now();
-    let r2 = mat1.mul(&mat2, ExecutionMode::Sequential);
-    let mul_seq_duration = start.elapsed();
-    println!("mul_vec_parallel duration: {:?}", mul_seq_duration);
+    for &size in &sizes {
+        let a = Tensor::random(size, size, seed);
+        let b = Tensor::random(size, size, seed + 1);
 
-    println!("Equal: {}", r1 == r2);
-    println!("mul_ vs mul_seq: {:.2}x", mul_seq_duration.as_secs_f64() / simd_duration.as_secs_f64());
+        let start = Instant::now();
+        let baseline = a.mul(&b, ExecutionMode::Sequential);
+        let duration_seq = start.elapsed().as_secs_f64();
 
-    println!("Dims r1: {}x{}", r1.rows, r1.cols);
-    println!("Dims r1: {}x{}", r2.rows, r2.cols);
-    count_diff(&r1, &r2, 0.0001);
+        let start = Instant::now();
+        let parallel = a.mul(&b, ExecutionMode::Parallel(6));
+        let duration_par = start.elapsed().as_secs_f64();
+        assert!(baseline == parallel);
 
+        let start = Instant::now();
+        let simd = a.mul(&b, ExecutionMode::SIMD);
+        let duration_simd = start.elapsed().as_secs_f64();
+        assert!(baseline == simd);
+
+        let start = Instant::now();
+        let parsimd = a.mul(&b, ExecutionMode::ParallelSIMD(6));
+        let duration_parsimd = start.elapsed().as_secs_f64();
+        assert!(baseline == parsimd);
+
+        let speedup_par = duration_seq / duration_par;
+        let speedup_simd = duration_seq / duration_simd;
+        let speedup_parsimd = duration_seq / duration_parsimd;
+
+        println!("{:<8} | {:<12.5} | {:<12.5} | {:<12.5} | {:<12.5}",
+            size, duration_seq, speedup_par, speedup_simd, speedup_parsimd);
+
+        writeln!(file, "{},{:.5},{:.5},{:.5},{:.5}",
+            size, duration_seq, speedup_par, speedup_simd, speedup_parsimd).unwrap();
+    }
 }
