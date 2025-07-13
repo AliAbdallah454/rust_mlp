@@ -1,0 +1,5 @@
+mlp,seq,parallel,simd
+small, 1, 0.75, 0.866
+medium, 1, 1.17, 1.64
+large, 1, 1.72, 2.13
+very large, 1, 2.01, 3.498 
