@@ -1,8 +1,8 @@
-use cp_proj::helpers::split_dataset;
-use cp_proj::layer::ActivationType;
-use cp_proj::mlp::{LossFunction, MLP};
-use cp_proj::mnits_data::MnistData;
-use cp_proj::tensor::{ExecutionMode, Tensor};
+use rust_mlp::helpers::split_dataset;
+use rust_mlp::layer::ActivationType;
+use rust_mlp::mlp::{LossFunction, MLP};
+use rust_mlp::mnits_data::MnistData;
+use rust_mlp::tensor::{ExecutionMode, Tensor};
 use std::time::Instant;
 
 fn main() {

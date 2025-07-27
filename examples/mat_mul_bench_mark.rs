@@ -1,4 +1,4 @@
-use cp_proj::tensor::{ExecutionMode, Tensor};
+use rust_mlp::tensor::{ExecutionMode, Tensor};
 
 fn main() {
 

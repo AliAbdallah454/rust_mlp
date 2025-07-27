@@ -1,7 +1,6 @@
 use std::arch::x86_64::{_mm256_add_ps, _mm256_loadu_ps, _mm256_mul_ps, _mm256_setzero_ps, _mm256_storeu_ps};
 use std::sync::Arc;
 use std::{thread, vec};
-use std::ops::{Add, Sub};
 use rand_pcg::Pcg64;
 use rand::distributions::{Distribution, Uniform};
 
@@ -28,49 +27,6 @@ pub struct Tensor {
     pub shape: Vec<usize>,
 }
 
-impl Add for &Tensor {
-    type Output = Tensor;
-
-    fn add(self, rhs: &Tensor) -> Tensor {
-        assert_eq!(self.shape, rhs.shape, "Tensor add: shape mismatch {:?} vs {:?}", self.shape, rhs.shape);
-        let data = self.data.iter().zip(rhs.data.iter()).map(|(a, b)| a + b).collect();
-        Tensor::new(data, self.shape.clone())
-    }
-}
-
-impl Sub for &Tensor {
-    type Output = Tensor;
-
-    fn sub(self, rhs: &Tensor) -> Tensor {
-        assert_eq!(self.shape, rhs.shape, "Tensor sub: shape mismatch {:?} vs {:?}", self.shape, rhs.shape);
-        let data = self.data.iter().zip(rhs.data.iter()).map(|(a, b)| a - b).collect();
-        Tensor::new(data, self.shape.clone())
-    }
-}
-
-impl Sub for Tensor {
-    type Output = Tensor;
-
-    fn sub(self, rhs: Tensor) -> Tensor {
-        assert_eq!(self.shape, rhs.shape, "Tensor sub: shape mismatch {:?} vs {:?}", self.shape, rhs.shape);
-        let data = self.data.iter().zip(rhs.data.iter()).map(|(a, b)| a - b).collect();
-        Tensor::new(data, self.shape.clone())
-    }
-}
-
-impl PartialEq for Tensor {
-    fn eq(&self, other: &Self) -> bool {
-        let epsilon = 1e-2;
-        if self.shape != other.shape {
-            return false;
-        }
-
-        self.data.iter()
-            .zip(&other.data)
-            .all(|(a, b)| (a - b).abs() < epsilon)
-    }
-}
-
 impl Tensor {
 
     pub fn new(data: Vec<f32>, shape: Vec<usize>) -> Tensor {
@@ -82,10 +38,6 @@ impl Tensor {
             data,
             shape,
         }
-    }
-
-    pub fn new_2d(data: Vec<f32>, rows: usize, cols: usize) -> Tensor {
-        Self::new(data, vec![rows, cols])
     }
 
     pub fn scalar(scalar: f32) -> Tensor {
@@ -138,11 +90,6 @@ impl Tensor {
         Tensor::new(data, shape)
     }
 
-    pub fn random_2d(rows: usize, cols: usize, seed: u64) -> Self {
-        Self::random(vec![rows, cols], seed)
-    }
-
-    #[allow(dead_code)]
     pub fn print(&self) {
         if self.rank() == 2 {
             // Print as matrix
@@ -169,18 +116,10 @@ impl Tensor {
         Tensor::new(data, shape)
     }
 
-    pub fn ones_2d(rows: usize, cols: usize) -> Tensor {
-        Self::ones(vec![rows, cols])
-    }
-
     pub fn zeros(shape: Vec<usize>) -> Tensor {
         let size: usize = shape.iter().product();
         let data = vec![0.0; size];
         Tensor::new(data, shape)
-    }
-
-    pub fn zeros_2d(rows: usize, cols: usize) -> Tensor {
-        Self::zeros(vec![rows, cols])
     }
 
     pub fn transpose(&self) -> Tensor {

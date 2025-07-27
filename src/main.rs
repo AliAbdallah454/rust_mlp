@@ -1,4 +1,4 @@
-use cp_proj::tensor::{ExecutionMode, Tensor};
+use rust_mlp::tensor::{ExecutionMode, Tensor};
 use std::time::Instant;
 
 fn count_diff(a: &Tensor, b: &Tensor, epsilon: f32) {
