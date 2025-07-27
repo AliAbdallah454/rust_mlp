@@ -24,10 +24,10 @@ impl Layer {
 
         // Xavier Initialization
         let scale = (2.0 / input_size as f32).sqrt();
-        let mut weights = Tensor::random(output_size, input_size, seed);
+        let mut weights = Tensor::random_2d(output_size, input_size, seed);
         weights = weights.scale(scale);
         
-        let biases = Tensor::zeros(output_size, 1);
+        let biases = Tensor::zeros_2d(output_size, 1);
         
         Self {
             weights,
@@ -70,7 +70,7 @@ impl Layer {
         let activation_derivative = match self.activation {
             ActivationType::ReLU => pre_activation.relu_derivative(),
             ActivationType::Sigmoid => pre_activation.sigmoid_derivative(),
-            ActivationType::Linear => Tensor::ones(pre_activation.rows, pre_activation.cols),
+            ActivationType::Linear => Tensor::ones(pre_activation.shape.clone()),
             ActivationType::Tanh => pre_activation.tanh_derivative(),
             ActivationType::Softmax => pre_activation.softmax_derivative()
         };

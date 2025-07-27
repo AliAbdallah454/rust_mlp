@@ -150,7 +150,7 @@ impl MLP {
         // Write each layer
         for layer in &self.layers {
             // Write layer metadata
-            writeln!(writer, "{} {}", layer.weights.rows, layer.weights.cols)?;
+            writeln!(writer, "{} {}", layer.weights.rows(), layer.weights.cols())?;
             
             // Write activation type
             match layer.activation {
@@ -265,7 +265,7 @@ impl MLP {
                     .map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidData, "Invalid weight value"))?;
                 weights_data.push(weight);
             }
-            let weights = Tensor::new(weights_data, rows, cols);
+            let weights = Tensor::new(weights_data, vec![rows, cols]);
             
             // Read biases
             let mut biases_data = Vec::new();
@@ -276,7 +276,7 @@ impl MLP {
                     .map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidData, "Invalid bias value"))?;
                 biases_data.push(bias);
             }
-            let biases = Tensor::new(biases_data, rows, 1);
+            let biases = Tensor::new(biases_data, vec![rows, 1]);
             
             // Create layer with proper initialization
             let layer = Layer {

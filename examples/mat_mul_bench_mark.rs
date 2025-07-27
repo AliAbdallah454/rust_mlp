@@ -4,8 +4,8 @@ fn main() {
 
     let size = 500;
 
-    let mat1 = Tensor::random(size, size, 42);
-    let mat2 = Tensor::random(size, size, 24);
+    let mat1 = Tensor::random_2d(size, size, 42);
+    let mat2 = Tensor::random_2d(size, size, 24);
 
     let start_seq = std::time::Instant::now();
     let _res_seq = mat1.mul(&mat2, ExecutionMode::Sequential);

@@ -4,10 +4,10 @@ use std::time::Instant;
 
 // Helper function to compare tensors with floating point tolerance
 fn tensors_equal(a: &Tensor, b: &Tensor, tolerance: f32) -> bool {
-    if a.rows != b.rows || a.cols != b.cols {
+    if a.shape != b.shape {
         return false;
     }
-    
+
     for i in 0..a.data.len() {
         if (a.data[i] - b.data[i]).abs() > tolerance {
             return false;
@@ -18,7 +18,7 @@ fn tensors_equal(a: &Tensor, b: &Tensor, tolerance: f32) -> bool {
 
 // Helper function to create a tensor with known values for testing
 fn create_test_tensor(data: Vec<f32>, rows: usize, cols: usize) -> Tensor {
-    Tensor::new(data, rows, cols)
+    Tensor::new_2d(data, rows, cols)
 }
 
 #[test]
@@ -143,8 +143,8 @@ fn test_row_vector_multiplication() {
 fn test_large_matrices() {
     // Test larger matrices to verify threading works correctly
     let size = 100;
-    let a = Tensor::random(size, size, 42);
-    let b = Tensor::random(size, size, 123);
+    let a = Tensor::random_2d(size, size, 42);
+    let b = Tensor::random_2d(size, size, 123);
     
     let result_seq = a.mul_seq(&b);
     let result_par_1 = a.mul_par(&b, 1);
@@ -160,8 +160,8 @@ fn test_large_matrices() {
 #[test]
 fn test_non_square_large_matrices() {
     // Test non-square matrices with threading
-    let a = Tensor::random(50, 75, 42);
-    let b = Tensor::random(75, 60, 123);
+    let a = Tensor::random_2d(50, 75, 42);
+    let b = Tensor::random_2d(75, 60, 123);
     
     let result_seq = a.mul_seq(&b);
     let result_par_2 = a.mul_par(&b, 2);
@@ -241,8 +241,8 @@ fn test_consistency_across_implementations() {
     ];
 
     for (r1, c1, c2) in test_cases {
-        let a = Tensor::random(r1, c1, 42);
-        let b = Tensor::random(c1, c2, 123);
+        let a = Tensor::random_2d(r1, c1, 42);
+        let b = Tensor::random_2d(c1, c2, 123);
         
         let result_seq = a.mul_seq(&b);
         let result_par_1 = a.mul_par(&b, 1);
@@ -257,8 +257,8 @@ fn test_consistency_across_implementations() {
 fn test_performance_comparison() {
     // Basic performance test to ensure parallel versions don't crash
     let size = 50;
-    let a = Tensor::random(size, size, 42);
-    let b = Tensor::random(size, size, 123);
+    let a = Tensor::random_2d(size, size, 42);
+    let b = Tensor::random_2d(size, size, 123);
     
     let start = Instant::now();
     let _result_seq = a.mul_seq(&b);

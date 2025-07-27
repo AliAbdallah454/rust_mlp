@@ -17,17 +17,17 @@ fn main() {
     let mut labels: Vec<Tensor> = Vec::with_capacity(data.labels.len());
 
     for image in data.images.iter() {
-        images.push(Tensor::new(image.clone(), 28*28, 1));
+        images.push(Tensor::new_2d(image.clone(), 28*28, 1));
     }
     
     for label in data.labels.iter() {
         let mut one_hot = vec![0.0; 10];
         one_hot[*label as usize] = 1.0;
-        labels.push(Tensor::new(one_hot, 10, 1));
+        labels.push(Tensor::new_2d(one_hot, 10, 1));
     }
 
-    // images.truncate(15_000);
-    // labels.truncate(15_000);
+    images.truncate(1_000);
+    labels.truncate(1_000);
 
     let (
         training_images, 

@@ -25,18 +25,16 @@ pub enum ExecutionMode {
 #[derive(Debug, Clone)]
 pub struct Tensor {
     pub data: Vec<f32>,
-    pub rows: usize,
-    pub cols: usize
+    pub shape: Vec<usize>,
 }
 
 impl Add for &Tensor {
     type Output = Tensor;
 
     fn add(self, rhs: &Tensor) -> Tensor {
-        assert_eq!(self.rows, rhs.rows, "Tensor add: row mismatch");
-        assert_eq!(self.cols, rhs.cols, "Tensor add: col mismatch");
+        assert_eq!(self.shape, rhs.shape, "Tensor add: shape mismatch {:?} vs {:?}", self.shape, rhs.shape);
         let data = self.data.iter().zip(rhs.data.iter()).map(|(a, b)| a + b).collect();
-        Tensor::new(data, self.rows, self.cols)
+        Tensor::new(data, self.shape.clone())
     }
 }
 
@@ -44,10 +42,9 @@ impl Sub for &Tensor {
     type Output = Tensor;
 
     fn sub(self, rhs: &Tensor) -> Tensor {
-        assert_eq!(self.rows, rhs.rows, "Tensor sub: row mismatch");
-        assert_eq!(self.cols, rhs.cols, "Tensor sub: col mismatch");
+        assert_eq!(self.shape, rhs.shape, "Tensor sub: shape mismatch {:?} vs {:?}", self.shape, rhs.shape);
         let data = self.data.iter().zip(rhs.data.iter()).map(|(a, b)| a - b).collect();
-        Tensor::new(data, self.rows, self.cols)
+        Tensor::new(data, self.shape.clone())
     }
 }
 
@@ -55,17 +52,16 @@ impl Sub for Tensor {
     type Output = Tensor;
 
     fn sub(self, rhs: Tensor) -> Tensor {
-        assert_eq!(self.rows, rhs.rows, "Tensor sub: row mismatch");
-        assert_eq!(self.cols, rhs.cols, "Tensor sub: col mismatch");
+        assert_eq!(self.shape, rhs.shape, "Tensor sub: shape mismatch {:?} vs {:?}", self.shape, rhs.shape);
         let data = self.data.iter().zip(rhs.data.iter()).map(|(a, b)| a - b).collect();
-        Tensor::new(data, self.rows, self.cols)
+        Tensor::new(data, self.shape.clone())
     }
 }
 
 impl PartialEq for Tensor {
     fn eq(&self, other: &Self) -> bool {
         let epsilon = 1e-2;
-        if self.rows != other.rows || self.cols != other.cols {
+        if self.shape != other.shape {
             return false;
         }
 
@@ -77,67 +73,132 @@ impl PartialEq for Tensor {
 
 impl Tensor {
 
-    pub fn new(data: Vec<f32>, rows: usize, cols: usize) -> Tensor {
+    pub fn new(data: Vec<f32>, shape: Vec<usize>) -> Tensor {
+        let expected_size: usize = shape.iter().product();
+        assert_eq!(data.len(), expected_size, 
+            "Data length {} doesn't match shape {:?} (expected {})", 
+            data.len(), shape, expected_size);
         Tensor {
-            data: data,
-            rows: rows,
-            cols: cols
+            data,
+            shape,
         }
     }
 
-    pub fn scalar(scalar: f32) -> Tensor {
-        Tensor { data: vec![scalar], rows: 1, cols: 1 }
+    pub fn new_2d(data: Vec<f32>, rows: usize, cols: usize) -> Tensor {
+        Self::new(data, vec![rows, cols])
     }
 
-    pub fn random(rows: usize, cols: usize, seed: u64) -> Self {
+    pub fn scalar(scalar: f32) -> Tensor {
+        Tensor { data: vec![scalar], shape: vec![1] }
+    }
+
+    // Helper methods for shape operations
+    pub fn rank(&self) -> usize {
+        self.shape.len()
+    }
+
+    pub fn size(&self) -> usize {
+        self.shape.iter().product()
+    }
+
+    pub fn shape(&self) -> &[usize] {
+        &self.shape
+    }
+
+    pub fn rows(&self) -> usize {
+        if self.shape.len() >= 1 { self.shape[0] } else { 1 }
+    }
+
+    pub fn cols(&self) -> usize {
+        if self.shape.len() >= 2 { self.shape[1] } else { 1 }
+    }
+
+    pub fn is_vector(&self) -> bool {
+        self.rank() == 1
+    }
+
+    pub fn is_matrix(&self) -> bool {
+        self.rank() == 2
+    }
+
+    pub fn is_scalar(&self) -> bool {
+        self.size() == 1
+    }
+
+    pub fn random(shape: Vec<usize>, seed: u64) -> Self {
         use rand::SeedableRng;
         let mut rng = Pcg64::seed_from_u64(seed);
         // can be changed to be from -1.0 to 1.0 later
         let uniform = Uniform::new(0.0, 1.0);
-        let data = (0..rows * cols)
+        let size: usize = shape.iter().product();
+        let data = (0..size)
             .map(|_| uniform.sample(&mut rng))
             .collect::<Vec<f32>>();
 
-        Tensor::new(data, rows, cols)
+        Tensor::new(data, shape)
+    }
+
+    pub fn random_2d(rows: usize, cols: usize, seed: u64) -> Self {
+        Self::random(vec![rows, cols], seed)
     }
 
     #[allow(dead_code)]
     pub fn print(&self) {
-        for r in 0..self.rows {
-            for c in 0..self.cols {
-                print!("{:.5} ", self.data[(r * self.cols + c) as usize]);
+        if self.rank() == 2 {
+            // Print as matrix
+            for r in 0..self.rows() {
+                for c in 0..self.cols() {
+                    print!("{:.5} ", self.data[(r * self.cols() + c) as usize]);
+                }
+                println!();
             }
-            println!();
+        } else {
+            // Print as general tensor with shape
+            println!("Tensor shape: {:?}", self.shape);
+            println!("Data: {:?}", self.data);
         }
     }
 
     pub fn dims(&self) -> (usize, usize) {
-        (self.rows, self.cols)
+        (self.rows(), self.cols())
     }
 
-    pub fn ones(rows: usize, cols: usize) -> Tensor {
-        let data = vec![1.0; (rows * cols) as usize];
-        Tensor::new(data, rows, cols)
+    pub fn ones(shape: Vec<usize>) -> Tensor {
+        let size: usize = shape.iter().product();
+        let data = vec![1.0; size];
+        Tensor::new(data, shape)
     }
 
-    pub fn zeros(rows: usize, cols: usize) -> Tensor {
-        let data = vec![0.0; (rows * cols) as usize];
-        Tensor::new(data, rows, cols)
+    pub fn ones_2d(rows: usize, cols: usize) -> Tensor {
+        Self::ones(vec![rows, cols])
+    }
+
+    pub fn zeros(shape: Vec<usize>) -> Tensor {
+        let size: usize = shape.iter().product();
+        let data = vec![0.0; size];
+        Tensor::new(data, shape)
+    }
+
+    pub fn zeros_2d(rows: usize, cols: usize) -> Tensor {
+        Self::zeros(vec![rows, cols])
     }
 
     pub fn transpose(&self) -> Tensor {
-        let mut data = vec![0.0; (self.rows * self.cols) as usize];
-        for i in 0..self.rows {
-            for j in 0..self.cols {
-                data[(j * self.rows + i) as usize] = self.data[(i * self.cols + j) as usize];
+        assert_eq!(self.rank(), 2, "Transpose only supported for 2D tensors");
+        let rows = self.rows();
+        let cols = self.cols();
+        let mut data = vec![0.0; rows * cols];
+        for i in 0..rows {
+            for j in 0..cols {
+                data[j * rows + i] = self.data[i * cols + j];
             }
         }
-        Tensor::new(data, self.cols, self.rows)
+        Tensor::new(data, vec![cols, rows])
     }
 
     pub fn scale(&self, scalar: f32) -> Tensor {
         let data = self.data.iter().map(|&x| x * scalar).collect();
-        Tensor::new(data, self.rows, self.cols)
+        Tensor::new(data, self.shape.clone())
     }
 
     pub fn sum(&self) -> f32 {
@@ -146,7 +207,7 @@ impl Tensor {
 
     pub fn square(&self) -> Tensor {
         let data = self.data.iter().map(|x| x * x).collect();
-        Tensor::new(data, self.rows, self.cols)
+        Tensor::new(data, self.shape.clone())
     }
 
     #[allow(dead_code)]
@@ -158,28 +219,31 @@ impl Tensor {
     }
 
     pub fn mul_vec(&self, vector: &Tensor) -> Tensor {
-        assert_eq!(vector.cols, 1, "Expected vector to be rx1 instead of {}x{}", vector.rows, vector.cols);
-        let mut res = vec![0.0 as f32; self.rows as usize];
+        let rows = self.rows();
+        let cols = self.cols();
+        let vec_cols = vector.cols();
+        assert_eq!(vec_cols, 1, "Expected vector to be rx1 instead of {}x{}", vector.rows(), vec_cols);
+        let mut res = vec![0.0 as f32; rows];
 
-        for i in 0..self.rows {
+        for i in 0..rows {
             unsafe {
                 let mut total = 0.0 as f32;
                 let mut elem = _mm256_setzero_ps();
                 
-                let complete_chunks = self.cols / 8;
+                let complete_chunks = cols / 8;
                 for j in 0..complete_chunks {
                     let offset = j * 8;
-                    let a_vec = _mm256_loadu_ps(self.data.as_ptr().add(i*self.cols + offset));
+                    let a_vec = _mm256_loadu_ps(self.data.as_ptr().add(i*cols + offset));
                     let b_vec = _mm256_loadu_ps(vector.data.as_ptr().add(offset));
                     let prod = _mm256_mul_ps(a_vec, b_vec);                   
                     elem = _mm256_add_ps(prod, elem);
                 }
 
-                let remaining = self.cols % 8;
+                let remaining = cols % 8;
                 if remaining > 0 {
                     let offset = complete_chunks * 8;
                     for j in 0..remaining {
-                        total += self.data[i*self.cols + offset + j] * vector.data[offset + j];
+                        total += self.data[i*cols + offset + j] * vector.data[offset + j];
                     }
                 }
 
@@ -191,15 +255,17 @@ impl Tensor {
                 *res.as_mut_ptr().add(i) = total;
             }
         }
-        Tensor::new(res, self.rows, 1)
+        Tensor::new(res, vec![rows, 1])
     }
 
     pub fn mul_vec_parallel(&self, vector: &Tensor, nb_threads: usize) -> Tensor {
+        let rows = self.rows();
+        let cols = self.cols();
 
-        let mut res = vec![0.0 as f32; self.rows];
+        let mut res = vec![0.0 as f32; rows];
         let raw_ptr = RawPointerWrapper {raw: res.as_mut_ptr()};
 
-        let rows_per_thread = self.rows / nb_threads;
+        let rows_per_thread = rows / nb_threads;
 
         let self_data: Arc<Vec<f32>> = Arc::from(self.data.clone());
         let vec_data: Arc<Vec<f32>> = Arc::from(vector.data.clone());
@@ -211,13 +277,12 @@ impl Tensor {
             let start = i * rows_per_thread;
             let mut end = start + rows_per_thread;
             if i == nb_threads - 1 {
-                end = self.rows;
+                end = rows;
             }
 
             let self_data = Arc::clone(&self_data);
             let vec_data = Arc::clone(&vec_data);
             let raw_ptr = raw_ptr;
-            let cols = self.cols;
 
             let handle = thread::spawn(move || {
 
@@ -259,41 +324,46 @@ impl Tensor {
         for handle in handles {
             handle.join().unwrap();
         }
-        Tensor::new(res, self.rows, 1)
+        Tensor::new(res, vec![rows, 1])
     }
 
     pub fn mul_simd(&self, tensor: &Tensor) -> Tensor {
-        assert_eq!(self.cols, tensor.rows, "Expected tensor dimensions to match: {}x{} * {}x{}", self.rows, self.cols, tensor.rows, tensor.cols);
-        let mut res = vec![0.0 as f32; (self.rows * tensor.cols) as usize];
+        let self_rows = self.rows();
+        let self_cols = self.cols();
+        let tensor_rows = tensor.rows();
+        let tensor_cols = tensor.cols();
+        
+        assert_eq!(self_cols, tensor_rows, "Expected tensor dimensions to match: {}x{} * {}x{}", self_rows, self_cols, tensor_rows, tensor_cols);
+        let mut res = vec![0.0 as f32; self_rows * tensor_cols];
     
-        let transposed = if tensor.cols != 1 {
+        let transposed = if tensor_cols != 1 {
             &tensor.transpose()
         } else {
             tensor
         };
 
-        for i in 0..self.rows {
-            for k in 0..tensor.cols {
+        for i in 0..self_rows {
+            for k in 0..tensor_cols {
                 unsafe {
                     let mut total = 0.0 as f32;
                     let mut elem = _mm256_setzero_ps();
                     
-                    let complete_chunks = self.cols / 8;
+                    let complete_chunks = self_cols / 8;
                     for j in 0..complete_chunks {
                         let offset = j * 8;
 
-                        let a_vec = _mm256_loadu_ps(self.data.as_ptr().add(i * self.cols + offset));
-                        let b_vec = _mm256_loadu_ps(transposed.data.as_ptr().add(k * transposed.cols + offset));
+                        let a_vec = _mm256_loadu_ps(self.data.as_ptr().add(i * self_cols + offset));
+                        let b_vec = _mm256_loadu_ps(transposed.data.as_ptr().add(k * transposed.cols() + offset));
 
                         let prod = _mm256_mul_ps(a_vec, b_vec);                   
                         elem = _mm256_add_ps(prod, elem);
                     }
     
-                    let remaining = self.cols % 8;
+                    let remaining = self_cols % 8;
                     if remaining > 0 {
                         let offset = complete_chunks * 8;
                         for j in 0..remaining {
-                            total += self.data[i * self.cols + offset + j] * transposed.data[k * transposed.cols + offset + j];
+                            total += self.data[i * self_cols + offset + j] * transposed.data[k * transposed.cols() + offset + j];
                         }
                     }
     
@@ -302,36 +372,36 @@ impl Tensor {
                     total += values[0] + values[1] + values[2] + values[3] + 
                             values[4] + values[5] + values[6] + values[7];
     
-                    *res.as_mut_ptr().add(i * tensor.cols + k) = total;
+                    *res.as_mut_ptr().add(i * tensor_cols + k) = total;
                 }
             }
         }
-        Tensor::new(res, self.rows, tensor.cols)
+        Tensor::new(res, vec![self_rows, tensor_cols])
     }
 
     pub fn mul_simd_parallel(&self, tensor: &Tensor, nb_threads: usize) -> Tensor {
 
         let mut flag = true;
 
-        let tensor = if tensor.cols != 1 {
+        let tensor = if tensor.cols() != 1 {
             flag = false;
             &tensor.transpose()
         } else {
             &tensor.clone()
         };
 
-        let c1 = self.cols;
-        let r1 = self.rows;
+        let c1 = self.cols();
+        let r1 = self.rows();
 
         let mut r2 = 0;
         let mut c2 = 0;
 
         if flag {
-            r2 = tensor.rows;
-            c2 = tensor.cols;
+            r2 = tensor.rows();
+            c2 = tensor.cols();
         } else {
-            r2 = tensor.cols;
-            c2 = tensor.rows;
+            r2 = tensor.cols();
+            c2 = tensor.rows();
         }
 
         let mut res = vec![0.0 as f32; r1 * c2];
@@ -349,7 +419,7 @@ impl Tensor {
             let start = i * rows_per_thread;
             let mut end = start + rows_per_thread;
             if i == nb_threads - 1 {
-                end = self.rows;
+                end = r1;
             }
 
             let self_data = Arc::clone(&self_data);
@@ -402,17 +472,17 @@ impl Tensor {
         for handle in handles {
             handle.join().unwrap();
         }
-        Tensor::new(res, r1, c2)
+        Tensor::new(res, vec![r1, c2])
 
     }
 
     #[allow(dead_code)]
     pub fn mul_seq(&self, matrix: &Tensor) -> Tensor {
 
-        let c1 = self.cols;
-        let r1 = self.rows;
-        let c2 = matrix.cols;
-        let r2 = matrix.rows;
+        let c1 = self.cols();
+        let r1 = self.rows();
+        let c2 = matrix.cols();
+        let r2 = matrix.rows();
 
         assert_eq!(c1, r2, "Matrix dimensions don't match: {}x{} * {}x{}", r1, c1, r2, c2);
 
@@ -427,15 +497,15 @@ impl Tensor {
                 result[i * c2 + j] = sum;
             }
         }
-        Tensor::new(result, r1, c2)
+        Tensor::new(result, vec![r1, c2])
     }
 
     #[allow(dead_code)]
     pub fn mul_par(&self, matrix: &Tensor, nb_threads: usize) -> Tensor {
-        let c1 = self.cols as usize;
-        let r1 = self.rows as usize;
-        let c2 = matrix.cols as usize;
-        let r2 = matrix.rows as usize;
+        let c1 = self.cols();
+        let r1 = self.rows();
+        let c2 = matrix.cols();
+        let r2 = matrix.rows();
 
         assert_eq!(c1, r2, "Matrix dimensions don't match: {}x{} * {}x{}", r1, c1, r2, c2);
 
@@ -473,7 +543,7 @@ impl Tensor {
             handle.join().unwrap();
         }
 
-        Tensor::new(result, r1, c2)
+        Tensor::new(result, vec![r1, c2])
     }
 
     pub fn mul(&self, matrix: &Tensor, execution_mode: ExecutionMode) -> Tensor {
@@ -486,7 +556,7 @@ impl Tensor {
     }
 
     pub fn argmax(&self) -> usize {
-        assert_eq!(self.cols, 1, "argmax only works on column vectors (rx1 tensors)");
+        assert_eq!(self.cols(), 1, "argmax only works on column vectors (rx1 tensors)");
         let mut max_idx = 0;
         let mut max_val = self.data[0];
         for (i, &val) in self.data.iter().enumerate() {
@@ -500,62 +570,61 @@ impl Tensor {
 
     // Element wise multiplication (i saw that the element wise mulitplication is called hadamard multiplication hence the name :) )
     pub fn hadamard(&self, other: &Tensor) -> Tensor {
-        assert_eq!(self.rows, other.rows, "Tensor hadamard: row mismatch");
-        assert_eq!(self.cols, other.cols, "Tensor hadamard: col mismatch");
+        assert_eq!(self.shape, other.shape, "Tensor hadamard: shape mismatch {:?} vs {:?}", self.shape, other.shape);
         
         let data = self.data.iter().zip(other.data.iter()).map(|(a, b)| a * b).collect();
-        Tensor::new(data, self.rows, self.cols)
+        Tensor::new(data, self.shape.clone())
     }
 
     // Sequential implementation
     pub fn relu(&self) -> Tensor {
         let data = self.data.iter().map(|&x| if x > 0.0 { x } else { 0.0 }).collect();
-        Tensor::new(data, self.rows, self.cols)
+        Tensor::new(data, self.shape.clone())
     }
 
     pub fn relu_derivative(&self) -> Tensor {
         let data = self.data.iter().map(|&x| if x > 0.0 { 1.0 } else { 0.0 }).collect();
-        Tensor::new(data, self.rows, self.cols)
+        Tensor::new(data, self.shape.clone())
     }
 
     pub fn sigmoid(&self) -> Tensor {
         let data = self.data.iter().map(|&x| 1.0 / (1.0 + (-x).exp())).collect();
-        Tensor::new(data, self.rows, self.cols)
+        Tensor::new(data, self.shape.clone())
     }
 
     /// Sigmoid derivative: sigmoid(x) * (1 - sigmoid(x))
     pub fn sigmoid_derivative(&self) -> Tensor {
         let sigmoid_vals = self.sigmoid();
-        let ones = Tensor::ones(self.rows, self.cols);
+        let ones = Tensor::ones(self.shape.clone());
         let one_minus_sigmoid = &ones - &sigmoid_vals;
         sigmoid_vals.hadamard(&one_minus_sigmoid)
     }
 
     pub fn tanh(&self) -> Tensor {
         let data = self.data.iter().map(|&x| x.tanh()).collect();
-        Tensor::new(data, self.rows, self.cols)
+        Tensor::new(data, self.shape.clone())
     }
 
     /// Tanh derivative: 1 - tanh(x)^2
     pub fn tanh_derivative(&self) -> Tensor {
         let tanh_vals = self.tanh();
-        let ones = Tensor::ones(self.rows, self.cols);
+        let ones = Tensor::ones(self.shape.clone());
         let tanh_squared = tanh_vals.hadamard(&tanh_vals);
         &ones - &tanh_squared
     }
 
     pub fn softmax(&self) -> Tensor {
-        assert_eq!(self.cols, 1, "Softmax only implemented for column vectors (r x 1)");
+        assert_eq!(self.cols(), 1, "Softmax only implemented for column vectors (r x 1)");
 
         let exp_vals: Vec<f32> = self.data.iter().map(|&x| x.exp()).collect();
         let sum: f32 = exp_vals.iter().sum();
         let data: Vec<f32> = exp_vals.iter().map(|&x| x / sum).collect();
-        Tensor::new(data, self.rows, self.cols)
+        Tensor::new(data, self.shape.clone())
     }
 
     // to get the derivative of the softmax we need to calculate its Jacobian Matrix
     pub fn softmax_derivative(&self) -> Tensor {
-        assert_eq!(self.cols, 1, "Softmax derivative only implemented for column vectors (r x 1)");
+        assert_eq!(self.cols(), 1, "Softmax derivative only implemented for column vectors (r x 1)");
     
         let softmax = self.softmax();
         let len = softmax.data.len();
@@ -574,46 +643,44 @@ impl Tensor {
             }
         }
     
-        Tensor::new(jacobian, len as usize, len as usize) // Jacobian is (r x r)
+        Tensor::new(jacobian, vec![len, len]) // Jacobian is (r x r)
     }
 
     pub fn mse_loss(&self, target: &Tensor) -> f32 {
         let diff = self - target;
         let squared = diff.square();
-        squared.sum() / (self.rows * self.cols) as f32
+        squared.sum() / self.size() as f32
     }
 
     pub fn mse_loss_derivative(&self, target: &Tensor) -> Tensor {
         let diff = self - target;
-        diff.scale(2.0 / (self.rows * self.cols) as f32)
+        diff.scale(2.0 / self.size() as f32)
     }
 
     // sum of -y*log(y_hat)
     pub fn categorical_cross_entropy(&self, targets: &Tensor) -> f32 {
-        assert_eq!(self.rows, targets.rows, "Batch size mismatch");
-        assert_eq!(self.cols, targets.cols, "Class count mismatch");
+        assert_eq!(self.shape, targets.shape, "Shape mismatch {:?} vs {:?}", self.shape, targets.shape);
     
         let epsilon = 1e-15; // To prevent log(0)
         let mut total_loss = 0.0;
     
-        for i in 0..(self.rows * self.cols) as usize {
+        for i in 0..self.size() {
             let y_true = targets.data[i];
             let y_pred = self.data[i].max(epsilon).min(1.0 - epsilon); // clip
             total_loss -= y_true * y_pred.ln();
         }
     
-        total_loss / self.rows as f32 // Can be changed ...
+        total_loss / self.rows() as f32 // Can be changed ...
     }
     
     // softmax - y
     pub fn categorical_cross_entropy_derivative(&self, targets: &Tensor) -> Tensor {
-        assert_eq!(self.rows, targets.rows, "Batch size mismatch");
-        assert_eq!(self.cols, targets.cols, "Class count mismatch");
-        assert_eq!(self.cols, 1, "Categorical cross entropy derivative only implemented for column vectors");
+        assert_eq!(self.shape, targets.shape, "Shape mismatch {:?} vs {:?}", self.shape, targets.shape);
+        assert_eq!(self.cols(), 1, "Categorical cross entropy derivative only implemented for column vectors");
 
         // self: softmax output, targets: one-hot labels
         let diff = self - targets;
-        diff.scale(1.0 / self.rows as f32) // Can be changed ...
+        diff.scale(1.0 / self.rows() as f32) // Can be changed ...
     }
 
 }
