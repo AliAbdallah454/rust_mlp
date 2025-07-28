@@ -2,7 +2,7 @@ use crate::tensor::Tensor;
 
 pub trait ActivationFunction {
 
-    fn activate(layer: &Tensor) -> Tensor;
+    fn forward(layer: &Tensor) -> Tensor;
     fn derivative(layer: &Tensor) -> Tensor;
 
 }
@@ -11,7 +11,7 @@ pub struct Relu;
 
 impl ActivationFunction for Relu {
 
-    fn activate(layer: &Tensor) -> Tensor {
+    fn forward(layer: &Tensor) -> Tensor {
         let data = layer.data.iter().map(|&x| if x > 0.0 { x } else { 0.0 }).collect();
         Tensor::new(data, layer.shape.clone())
     }
@@ -27,14 +27,14 @@ pub struct Sigmoid;
 
 impl ActivationFunction for Sigmoid {
 
-    fn activate(layer: &Tensor) -> Tensor {
+    fn forward(layer: &Tensor) -> Tensor {
         let data = layer.data.iter().map(|&x| 1.0 / (1.0 + (-x).exp())).collect();
         Tensor::new(data, layer.shape.clone())
     }
 
     /// Sigmoid derivative: sigmoid(x) * (1 - sigmoid(x))
     fn derivative(layer: &Tensor) -> Tensor {
-        let sigmoid_vals = Sigmoid::activate(layer);
+        let sigmoid_vals = Sigmoid::forward(layer);
         let ones = Tensor::ones(layer.shape.clone());
         let one_minus_sigmoid = &ones - &sigmoid_vals;
         sigmoid_vals.hadamard(&one_minus_sigmoid)
@@ -45,14 +45,14 @@ impl ActivationFunction for Sigmoid {
 pub struct Tanh;
 
 impl ActivationFunction for Tanh {
-    fn activate(layer: &Tensor) -> Tensor {
+    fn forward(layer: &Tensor) -> Tensor {
         let data = layer.data.iter().map(|&x| x.tanh()).collect();
         Tensor::new(data, layer.shape.clone())
     }
 
     /// Tanh derivative: 1 - tanh(x)^2
     fn derivative(layer: &Tensor) -> Tensor {
-        let tanh_vals = Tanh::activate(layer);
+        let tanh_vals = Tanh::forward(layer);
         let ones = Tensor::ones(layer.shape.clone());
         let tanh_squared = tanh_vals.hadamard(&tanh_vals);
         &ones - &tanh_squared
@@ -62,7 +62,7 @@ impl ActivationFunction for Tanh {
 pub struct Softmax;
 
 impl ActivationFunction for Softmax {
-    fn activate(layer: &Tensor) -> Tensor {
+    fn forward(layer: &Tensor) -> Tensor {
         assert_eq!(layer.cols(), 1, "Softmax only implemented for column vectors (r x 1)");
 
         let exp_vals: Vec<f32> = layer.data.iter().map(|&x| x.exp()).collect();
@@ -76,7 +76,7 @@ impl ActivationFunction for Softmax {
         assert_eq!(layer.cols(), 1, "Softmax derivative only implemented for column vectors (r x 1)");
     
         // let softmax = self.softmax();
-        let softmax = Softmax::activate(layer);
+        let softmax = Softmax::forward(layer);
         let len = softmax.data.len();
         let mut jacobian = vec![0.0; len * len];
     

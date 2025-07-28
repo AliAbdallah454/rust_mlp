@@ -53,11 +53,11 @@ impl Layer {
         self.last_pre_activation = Some(z_with_bias.clone());
         
         let output = match self.activation {
-            ActivationType::ReLU => Relu::activate(&z_with_bias),
-            ActivationType::Sigmoid => Sigmoid::activate(&z_with_bias),
+            ActivationType::ReLU => Relu::forward(&z_with_bias),
+            ActivationType::Sigmoid => Sigmoid::forward(&z_with_bias),
             ActivationType::Linear => z_with_bias,
-            ActivationType::Tanh => Tanh::activate(&z_with_bias),
-            ActivationType::Softmax => Softmax::activate(&z_with_bias)
+            ActivationType::Tanh => Tanh::forward(&z_with_bias),
+            ActivationType::Softmax => Softmax::forward(&z_with_bias)
         };
 
         self.last_output = Some(output.clone());
