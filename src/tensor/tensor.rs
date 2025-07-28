@@ -44,7 +44,6 @@ impl Tensor {
         Tensor { data: vec![scalar], shape: vec![1] }
     }
 
-    // Helper methods for shape operations
     pub fn rank(&self) -> usize {
         self.shape.len()
     }
