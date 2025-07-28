@@ -30,6 +30,7 @@ impl MLP {
                 layer_sizes[i], 
                 layer_sizes[i + 1], 
                 activations[i].clone(),
+                loss_function.clone(),
                 current_seed
             );
             layers.push(layer);
@@ -286,6 +287,7 @@ impl MLP {
                 last_input: None,
                 last_pre_activation: None,
                 last_output: None,
+                loss_function: loss_function.clone()
             };
             
             layers.push(layer);
