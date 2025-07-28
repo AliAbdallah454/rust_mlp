@@ -1,4 +1,5 @@
-use crate::{mlp::LossFunction, tensor::{ExecutionMode, Tensor}};
+use crate::{activation_functions::activation_function::ActivationFunction, mlp::LossFunction, tensor::{ExecutionMode, Tensor}};
+use crate::activation_functions::{Relu, Sigmoid, Tanh, Softmax};
 
 #[derive(Clone, Debug,PartialEq)]
 pub enum ActivationType {
@@ -52,13 +53,13 @@ impl Layer {
         self.last_pre_activation = Some(z_with_bias.clone());
         
         let output = match self.activation {
-            ActivationType::ReLU => z_with_bias.relu(),
-            ActivationType::Sigmoid => z_with_bias.sigmoid(),
+            ActivationType::ReLU => Relu::activate(&z_with_bias),
+            ActivationType::Sigmoid => Sigmoid::activate(&z_with_bias),
             ActivationType::Linear => z_with_bias,
-            ActivationType::Tanh => z_with_bias.tanh(),
-            ActivationType::Softmax => z_with_bias.softmax()
+            ActivationType::Tanh => Tanh::activate(&z_with_bias),
+            ActivationType::Softmax => Softmax::activate(&z_with_bias)
         };
-        
+
         self.last_output = Some(output.clone());
         
         output
@@ -70,15 +71,15 @@ impl Layer {
         let pre_activation = self.last_pre_activation.as_ref().expect("Forward pass must be called before backward");
         
         let activation_derivative = match self.activation {
-            ActivationType::ReLU => pre_activation.relu_derivative(),
-            ActivationType::Sigmoid => pre_activation.sigmoid_derivative(),
+            ActivationType::ReLU => Relu::derivative(pre_activation),
+            ActivationType::Sigmoid => Sigmoid::derivative(pre_activation),
             ActivationType::Linear => Tensor::ones(pre_activation.shape.clone()),
-            ActivationType::Tanh => pre_activation.tanh_derivative(),
+            ActivationType::Tanh => Tanh::derivative(pre_activation),
+            
             // For softmax activation function, this is useless since the drivative of the cross entropy takes into considiration the 
             // derivative of the softmax.
             ActivationType::Softmax => Tensor::zeros_2d(pre_activation.rows(), pre_activation.cols())
         };
-        
 
         // For Softmax, the derivative is a Jacobian, so we need to do a matrix-vector product
         // dL/dz = dL/da * da/dz (we have dL/da and da/dz)

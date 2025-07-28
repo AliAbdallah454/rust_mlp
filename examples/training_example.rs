@@ -3,7 +3,6 @@ use rust_mlp::layer::ActivationType;
 use rust_mlp::mlp::{LossFunction, MLP};
 use rust_mlp::mnits_data::MnistData;
 use rust_mlp::tensor::{ExecutionMode, Tensor};
-use std::time::Instant;
 
 fn main() {
     let train_data_result = MnistData::load_from_files(
@@ -36,12 +35,12 @@ fn main() {
         testing_labels
     ) = split_dataset(images, labels, 0.8);
 
-    let layer_sizes = vec![28*28, 24, 24, 10];
+    let layer_sizes = vec![28*28, 16, 16, 10];
     let activations = vec![ActivationType::ReLU, ActivationType::ReLU, ActivationType::Softmax];
         
     let mut mlp = MLP::new(layer_sizes, activations, LossFunction::CategoricalCrossEntropy, 0.05, ExecutionMode::ParallelSIMD, 42);
 
-    mlp.train(&training_images, &training_labels, 20);
+    mlp.train(&training_images, &training_labels, 17);
 
     let accuracy = evaluate_model(&mut mlp, &testing_images, &testing_labels);
     println!("Accuracy is: {}", accuracy);
