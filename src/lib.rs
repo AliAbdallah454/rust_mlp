@@ -5,3 +5,4 @@ pub mod mnits_data;
 pub mod helpers;
 
 pub mod activation_functions;
+pub mod loss_functions;

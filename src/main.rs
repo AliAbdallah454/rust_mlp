@@ -1,48 +1,8 @@
-use rust_mlp::tensor::{ExecutionMode, Tensor};
-use std::time::Instant;
-
-fn count_diff(a: &Tensor, b: &Tensor, epsilon: f32) {
-    assert_eq!(a.data.len(), b.data.len(), "Tensor data lengths must match");
-
-    let mut max = 0 as f32;
-    let mut count = 0;
-
-    for i in 0..a.data.len() {
-        if (a.data[i] - b.data[i]).abs() > epsilon {
-            count += 1;
-            max = max.max((a.data[i] - b.data[i]).abs());
-        }
-    }
-
-    println!("max: {}, count: {}", max, count);
-
-}
-
 fn main() {
 
     let v1 = vec![1, 2];
     let v2 = vec![1, 2];
 
     println!("{}", v1 == v2);
-
-    // let mat1 = Tensor::random_2d(512, 28*28, 42);
-    // let mat2 = Tensor::random_2d(28*28, 32, 24);
-
-    // let start = Instant::now();
-    // let r1 = mat1.mul(&mat2, ExecutionMode::ParallelSIMD);
-    // let simd_duration = start.elapsed();
-    // println!("parallel SIMD duration: {:?}", simd_duration);
-
-    // let start = Instant::now();
-    // let r2 = mat1.mul(&mat2, ExecutionMode::Sequential);
-    // let mul_seq_duration = start.elapsed();
-    // println!("mul_vec_parallel duration: {:?}", mul_seq_duration);
-
-    // println!("Equal: {}", r1 == r2);
-    // println!("mul_ vs mul_seq: {:.2}x", mul_seq_duration.as_secs_f64() / simd_duration.as_secs_f64());
-
-    // println!("Dims r1: {}x{}", r1.rows(), r1.cols());
-    // println!("Dims r2: {}x{}", r2.rows(), r2.cols());
-    // count_diff(&r1, &r2, 0.0001);
 
 }

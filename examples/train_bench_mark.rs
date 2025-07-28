@@ -1,6 +1,6 @@
 use rust_mlp::helpers::split_dataset;
 use rust_mlp::layer::ActivationType;
-use rust_mlp::mlp::{LossFunction, MLP};
+use rust_mlp::mlp::{LossFunctionEnum, MLP};
 use rust_mlp::mnits_data::MnistData;
 use rust_mlp::tensor::{ExecutionMode, Tensor};
 use std::time::Instant;
@@ -50,7 +50,7 @@ fn main() {
 
     let mut mlps: Vec<MLP> = execution_modes.iter().map(|&execution_mode| {
         MLP::new(layer_sizes.clone(), activations.clone(), 
-            LossFunction::CategoricalCrossEntropy, 0.01, execution_mode, 42)
+            LossFunctionEnum::CategoricalCrossEntropy, 0.01, execution_mode, 42)
     }).collect();
 
     let mut durations = Vec::new();

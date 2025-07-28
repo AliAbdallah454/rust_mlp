@@ -1,6 +1,6 @@
 use rust_mlp::helpers::{evaluate_model, split_dataset};
 use rust_mlp::layer::ActivationType;
-use rust_mlp::mlp::{LossFunction, MLP};
+use rust_mlp::mlp::{LossFunctionEnum, MLP};
 use rust_mlp::mnits_data::MnistData;
 use rust_mlp::tensor::{ExecutionMode, Tensor};
 
@@ -38,7 +38,7 @@ fn main() {
     let layer_sizes = vec![28*28, 16, 16, 10];
     let activations = vec![ActivationType::ReLU, ActivationType::ReLU, ActivationType::Softmax];
         
-    let mut mlp = MLP::new(layer_sizes, activations, LossFunction::CategoricalCrossEntropy, 0.05, ExecutionMode::ParallelSIMD, 42);
+    let mut mlp = MLP::new(layer_sizes, activations, LossFunctionEnum::CategoricalCrossEntropy, 0.05, ExecutionMode::ParallelSIMD, 42);
 
     mlp.train(&training_images, &training_labels, 17);
 

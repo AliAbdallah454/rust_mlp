@@ -1,4 +1,6 @@
 use crate::layer::{Layer, ActivationType};
+use crate::loss_functions::loss_function::LossFunction;
+use crate::loss_functions::{CategoricalCrossEntropy, MSE};
 use crate::tensor::{ExecutionMode, Tensor};
 
 use std::fs::File;
@@ -6,7 +8,7 @@ use std::io::{Write, Read, BufWriter, BufReader};
 use std::path::Path;
 
 #[derive(Clone, Debug, PartialEq)]
-pub enum LossFunction {
+pub enum LossFunctionEnum {
     MSE,
     CategoricalCrossEntropy
 }
@@ -15,11 +17,11 @@ pub struct MLP {
     pub layers: Vec<Layer>,
     pub execution_mode: ExecutionMode,
     pub learning_rate: f32,
-    pub loss_function: LossFunction 
+    pub loss_function: LossFunctionEnum 
 }
 
 impl MLP {
-    pub fn new(layer_sizes: Vec<usize>, activations: Vec<ActivationType>, loss_function: LossFunction, learning_rate: f32, execution_mode: ExecutionMode, seed: u64) -> Self {
+    pub fn new(layer_sizes: Vec<usize>, activations: Vec<ActivationType>, loss_function: LossFunctionEnum, learning_rate: f32, execution_mode: ExecutionMode, seed: u64) -> Self {
         assert_eq!(layer_sizes.len() - 1, activations.len(), "Number of activations must match number of layers");
         
         let mut layers = Vec::new();
@@ -58,13 +60,17 @@ impl MLP {
         
         // Compute loss
         let (loss, mut gradient) = match self.loss_function {
-            LossFunction::MSE => (
-                prediction.mse_loss(target),
-                prediction.mse_loss_derivative(target)
+            LossFunctionEnum::MSE => (
+                // prediction.mse_loss(target),
+                // prediction.mse_loss_derivative(target)
+                MSE::forward(prediction, target),
+                MSE::backward(prediction, target)
             ),
-            LossFunction::CategoricalCrossEntropy => (
-                prediction.categorical_cross_entropy(target),
-                prediction.categorical_cross_entropy_derivative(target)
+            LossFunctionEnum::CategoricalCrossEntropy => (
+                // prediction.categorical_cross_entropy(target),
+                // prediction.categorical_cross_entropy_derivative(target)
+                CategoricalCrossEntropy::forward(prediction, target),
+                CategoricalCrossEntropy::backward(prediction, target)
             ),
         };
 
@@ -144,8 +150,8 @@ impl MLP {
         
         // Write loss function
         match self.loss_function {
-            LossFunction::MSE => writeln!(writer, "MSE")?,
-            LossFunction::CategoricalCrossEntropy => writeln!(writer, "CategoricalCrossEntropy")?,
+            LossFunctionEnum::MSE => writeln!(writer, "MSE")?,
+            LossFunctionEnum::CategoricalCrossEntropy => writeln!(writer, "CategoricalCrossEntropy")?,
         }
         
         // Write each layer
@@ -224,8 +230,8 @@ impl MLP {
         // Read loss function
         let loss_function = match lines.next()
             .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::InvalidData, "Missing loss function"))? {
-            "MSE" => LossFunction::MSE,
-            "CategoricalCrossEntropy" => LossFunction::CategoricalCrossEntropy,
+            "MSE" => LossFunctionEnum::MSE,
+            "CategoricalCrossEntropy" => LossFunctionEnum::CategoricalCrossEntropy,
             _ => return Err(std::io::Error::new(std::io::ErrorKind::InvalidData, "Invalid loss function")),
         };
         

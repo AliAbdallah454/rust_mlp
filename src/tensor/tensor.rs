@@ -3,15 +3,7 @@ use std::sync::Arc;
 use std::{thread, vec};
 use rand_pcg::Pcg64;
 use rand::distributions::{Distribution, Uniform};
-
-#[derive(Clone, Copy)]
-struct RawPointerWrapper {
-    raw: *mut f32,
-}
-
-unsafe impl Send for RawPointerWrapper {}
-
-unsafe impl Sync for RawPointerWrapper {}
+use crate::tensor::raw_ptr::RawPointerWrapper;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ExecutionMode {
@@ -155,6 +147,8 @@ impl Tensor {
             *ptr = val;
         }
     }
+
+    // matmul
 
     pub fn mul_vec(&self, vector: &Tensor) -> Tensor {
         let rows = self.rows();
@@ -331,7 +325,9 @@ impl Tensor {
         let c1 = self.cols();
         let r1 = self.rows();
 
+        #[allow(unused_assignments)]
         let mut r2 = 0;
+        #[allow(unused_assignments)]
         let mut c2 = 0;
 
         if flag {
@@ -493,6 +489,8 @@ impl Tensor {
         }
     }
 
+    // matmul
+
     pub fn argmax(&self) -> usize {
         assert_eq!(self.cols(), 1, "argmax only works on column vectors (rx1 tensors)");
         let mut max_idx = 0;
@@ -512,43 +510,6 @@ impl Tensor {
         
         let data = self.data.iter().zip(other.data.iter()).map(|(a, b)| a * b).collect();
         Tensor::new(data, self.shape.clone())
-    }
-
-    pub fn mse_loss(&self, target: &Tensor) -> f32 {
-        let diff = self - target;
-        let squared = diff.square();
-        squared.sum() / self.size() as f32
-    }
-
-    pub fn mse_loss_derivative(&self, target: &Tensor) -> Tensor {
-        let diff = self - target;
-        diff.scale(2.0 / self.size() as f32)
-    }
-
-    // sum of -y*log(y_hat)
-    pub fn categorical_cross_entropy(&self, targets: &Tensor) -> f32 {
-        assert_eq!(self.shape, targets.shape, "Shape mismatch {:?} vs {:?}", self.shape, targets.shape);
-    
-        let epsilon = 1e-15; // To prevent log(0)
-        let mut total_loss = 0.0;
-    
-        for i in 0..self.size() {
-            let y_true = targets.data[i];
-            let y_pred = self.data[i].max(epsilon).min(1.0 - epsilon); // clip
-            total_loss -= y_true * y_pred.ln();
-        }
-    
-        total_loss / self.rows() as f32 // Can be changed ...
-    }
-    
-    // softmax - y
-    pub fn categorical_cross_entropy_derivative(&self, targets: &Tensor) -> Tensor {
-        assert_eq!(self.shape, targets.shape, "Shape mismatch {:?} vs {:?}", self.shape, targets.shape);
-        assert_eq!(self.cols(), 1, "Categorical cross entropy derivative only implemented for column vectors");
-
-        // self: softmax output, targets: one-hot labels
-        let diff = self - targets;
-        diff.scale(1.0 / self.rows() as f32) // Can be changed ...
     }
 
 }

@@ -1,4 +1,4 @@
-use crate::{activation_functions::activation_function::ActivationFunction, mlp::LossFunction, tensor::{ExecutionMode, Tensor}};
+use crate::{activation_functions::activation_function::ActivationFunction, mlp::LossFunctionEnum, tensor::{ExecutionMode, Tensor}};
 use crate::activation_functions::{Relu, Sigmoid, Tanh, Softmax};
 
 #[derive(Clone, Debug,PartialEq)]
@@ -18,11 +18,11 @@ pub struct Layer {
     pub last_input: Option<Tensor>,
     pub last_pre_activation: Option<Tensor>,
     pub last_output: Option<Tensor>,
-    pub loss_function: LossFunction
+    pub loss_function: LossFunctionEnum
 }
 
 impl Layer {
-    pub fn new(input_size: usize, output_size: usize, activation: ActivationType, loss_functions: LossFunction, seed: u64) -> Self {
+    pub fn new(input_size: usize, output_size: usize, activation: ActivationType, loss_functions: LossFunctionEnum, seed: u64) -> Self {
 
         // Xavier Initialization
         let scale = (2.0 / input_size as f32).sqrt();
