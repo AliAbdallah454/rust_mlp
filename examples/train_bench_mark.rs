@@ -36,14 +36,16 @@ fn main() {
         _testing_labels
     ) = split_dataset(images, labels, 0.8);
 
-    let layer_sizes = vec![28*28, 1048*8, 1048*8, 10];
+    let layer_sizes = vec![28*28, 32*32, 32*32, 10];
     let activations = vec![ActivationType::ReLU, ActivationType::ReLU, ActivationType::Softmax];
         
     let execution_modes = vec![
         ExecutionMode::Sequential, 
         ExecutionMode::Parallel, 
         ExecutionMode::SIMD, 
-        ExecutionMode::ParallelSIMD
+        ExecutionMode::ParallelSIMD,
+        ExecutionMode::Cuda,
+        ExecutionMode::CuBLAS
     ];
     
     println!("\nTesting different Execution Modes ...");

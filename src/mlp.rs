@@ -144,6 +144,8 @@ impl MLP {
             ExecutionMode::Parallel => writeln!(writer, "Parallel")?,
             ExecutionMode::SIMD => writeln!(writer, "SIMD")?,
             ExecutionMode::ParallelSIMD => writeln!(writer, "ParallelSIMD")?,
+            ExecutionMode::Cuda => writeln!(writer, "Cuda")?,
+            ExecutionMode::CuBLAS => writeln!(writer, "CuBLAS")?,
         }
         
         writeln!(writer, "{:.17}", self.learning_rate)?; // High precision for f32

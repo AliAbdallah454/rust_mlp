@@ -1,8 +1,17 @@
+use rust_mlp::tensor::{ExecutionMode, Tensor};
+
 fn main() {
 
-    let v1 = vec![1, 2];
-    let v2 = vec![1, 2];
+    const M: usize = 64;
+    const K: usize = 32;
+    const N: usize = 128;
 
-    println!("{}", v1 == v2);
+    let mat1 = Tensor::random_2d(M, K, 42);
+    let mat2 = Tensor::random_2d(K, N, 24);
+
+    let res_cpu = mat1.mul(&mat2, ExecutionMode::Sequential);
+    let res = mat1.mul(&mat2, ExecutionMode::CuBLAS);
+
+    println!("{}", res_cpu == res);
 
 }

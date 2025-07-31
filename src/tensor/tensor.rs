@@ -5,12 +5,16 @@ use rand_pcg::Pcg64;
 use rand::distributions::{Distribution, Uniform};
 use crate::tensor::raw_ptr::RawPointerWrapper;
 
+use crate::tensor::cuda_matmul::{cuda_mat_mul, cublas_mat_mul};
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ExecutionMode {
     Sequential,
     Parallel,
     SIMD,
     ParallelSIMD,
+    Cuda,
+    CuBLAS
 }
 
 #[derive(Debug, Clone)]
@@ -480,12 +484,22 @@ impl Tensor {
         Tensor::new(result, vec![r1, c2])
     }
 
+    pub fn mul_cuda(&self, matrix: &Tensor) -> Tensor {
+        cuda_mat_mul(self, matrix, self.rows(), self.cols(), matrix.cols())
+    }
+
+    pub fn mul_cublas(&self, matrix: &Tensor) -> Tensor {
+        cublas_mat_mul(self, matrix, self.rows(), self.cols(), matrix.cols())
+    }
+
     pub fn mul(&self, matrix: &Tensor, execution_mode: ExecutionMode) -> Tensor {
         match execution_mode {
             ExecutionMode::Sequential => self.mul_seq(matrix),
             ExecutionMode::Parallel => self.mul_par(matrix, 6),
             ExecutionMode::SIMD => self.mul_simd(matrix),
-            ExecutionMode::ParallelSIMD => self.mul_simd_parallel(matrix, 6)
+            ExecutionMode::ParallelSIMD => self.mul_simd_parallel(matrix, 6),
+            ExecutionMode::Cuda => self.mul_cuda(matrix),
+            ExecutionMode::CuBLAS => self.mul_cublas(matrix)
         }
     }
 
